@@ -46,6 +46,8 @@ static RUNTIME: LazyLock<Runtime> = LazyLock::new(|| {
 /// HTTP client that can impersonate web browsers.
 pub struct RClient {
     client: Arc<Mutex<wreq::Client>>,
+    // Cookie jar for manual cookie management
+    cookie_jar: Arc<wreq::cookie::Jar>,
     #[pyo3(get, set)]
     auth: Option<(String, Option<String>)>,
     #[pyo3(get, set)]
@@ -70,6 +72,16 @@ pub struct RClient {
     ca_cert_file: Option<String>,
     https_only: Option<bool>,
     http2_only: Option<bool>,
+    // Performance optimization fields
+    pool_idle_timeout: Option<f64>,
+    pool_max_idle_per_host: Option<usize>,
+    tcp_nodelay: Option<bool>,
+    tcp_keepalive: Option<f64>,
+    // Retry mechanism
+    #[pyo3(get, set)]
+    retry_count: Option<usize>,
+    #[pyo3(get, set)]
+    retry_backoff: Option<f64>,
 }
 
 #[pymethods]
@@ -126,7 +138,9 @@ impl RClient {
     #[new]
     #[pyo3(signature = (auth=None, auth_bearer=None, params=None, headers=None, cookie_store=true,
         referer=true, proxy=None, timeout=None, impersonate=None, impersonate_os=None, follow_redirects=true,
-        max_redirects=20, verify=true, ca_cert_file=None, https_only=false, http2_only=false))]
+        max_redirects=20, verify=true, ca_cert_file=None, https_only=false, http2_only=false,
+        pool_idle_timeout=None, pool_max_idle_per_host=None, tcp_nodelay=None, tcp_keepalive=None,
+        retry_count=None, retry_backoff=None))]
     fn new(
         auth: Option<(String, Option<String>)>,
         auth_bearer: Option<String>,
@@ -144,6 +158,14 @@ impl RClient {
         ca_cert_file: Option<String>,
         https_only: Option<bool>,
         http2_only: Option<bool>,
+        // Performance optimization parameters
+        pool_idle_timeout: Option<f64>,
+        pool_max_idle_per_host: Option<usize>,
+        tcp_nodelay: Option<bool>,
+        tcp_keepalive: Option<f64>,
+        // Retry mechanism
+        retry_count: Option<usize>,
+        retry_backoff: Option<f64>,
     ) -> Result<Self> {
         // Client builder
         let mut client_builder = wreq::Client::builder();
@@ -169,9 +191,12 @@ impl RClient {
             client_builder = client_builder.default_headers(headers_headermap);
         };
 
+        // Cookie jar - create and configure
+        let cookie_jar = Arc::new(wreq::cookie::Jar::default());
+
         // Cookie_store
         if cookie_store.unwrap_or(true) {
-            client_builder = client_builder.cookie_store(true);
+            client_builder = client_builder.cookie_provider(cookie_jar.clone());
         }
 
         // Referer
@@ -199,7 +224,9 @@ impl RClient {
 
         // Ca_cert_file. BEFORE!!! verify (fn load_ca_certs() reads env var PRIMP_CA_BUNDLE)
         if let Some(ca_bundle_path) = &ca_cert_file {
-            std::env::set_var("PRIMP_CA_BUNDLE", ca_bundle_path);
+            unsafe {
+                std::env::set_var("PRIMP_CA_BUNDLE", ca_bundle_path);
+            }
         }
 
         // Verify
@@ -221,10 +248,29 @@ impl RClient {
             client_builder = client_builder.http2_only();
         }
 
+        // Performance optimization: Connection pool settings
+        if let Some(timeout) = pool_idle_timeout {
+            client_builder = client_builder.pool_idle_timeout(Duration::from_secs_f64(timeout));
+        }
+
+        if let Some(max_idle) = pool_max_idle_per_host {
+            client_builder = client_builder.pool_max_idle_per_host(max_idle);
+        }
+
+        // TCP optimization
+        if let Some(true) = tcp_nodelay {
+            client_builder = client_builder.tcp_nodelay(true);
+        }
+
+        if let Some(interval) = tcp_keepalive {
+            client_builder = client_builder.tcp_keepalive(Some(Duration::from_secs_f64(interval)));
+        }
+
         let client = Arc::new(Mutex::new(client_builder.build()?));
 
         Ok(RClient {
             client,
+            cookie_jar,
             auth,
             auth_bearer,
             params,
@@ -242,6 +288,14 @@ impl RClient {
             ca_cert_file,
             https_only,
             http2_only,
+            // Performance optimization fields
+            pool_idle_timeout,
+            pool_max_idle_per_host,
+            tcp_nodelay,
+            tcp_keepalive,
+            // Retry mechanism
+            retry_count,
+            retry_backoff,
         })
     }
 
@@ -307,17 +361,32 @@ impl RClient {
         Ok(())
     }
 
-    #[pyo3(signature = (_url))]
-    fn get_cookies(&self, _url: &str) -> Result<IndexMapSSR> {
-        // Note: Cookie retrieval method differs in wreq
-        // Returning empty map for now
-        Ok(IndexMap::with_capacity_and_hasher(10, RandomState::default()))
+    #[pyo3(signature = (url))]
+    #[allow(unused_variables)]
+    fn get_cookies(&self, url: &str) -> Result<IndexMapSSR> {
+        let mut cookies = IndexMap::with_capacity_and_hasher(10, RandomState::default());
+
+        // Get all cookies from the jar
+        // Note: wreq's get_all() returns all cookies regardless of URL
+        // To get URL-specific cookies, you would need to filter manually or use get(name, uri) per cookie
+        for cookie in self.cookie_jar.get_all() {
+            cookies.insert(cookie.name().to_string(), cookie.value().to_string());
+        }
+
+        Ok(cookies)
     }
 
-    #[pyo3(signature = (_url, _cookies))]
-    fn set_cookies(&self, _url: &str, _cookies: Option<IndexMapSSR>) -> Result<()> {
-        // Note: wreq cookie setting API differs from rquest
-        // This functionality may not be fully supported
+    #[pyo3(signature = (url, cookies))]
+    fn set_cookies(&self, url: &str, cookies: Option<IndexMapSSR>) -> Result<()> {
+        if let Some(cookies) = cookies {
+            let uri: wreq::Uri = url.parse()?;
+
+            for (name, value) in cookies {
+                // Format as "name=value" cookie string
+                let cookie_str = format!("{}={}", name, value);
+                self.cookie_jar.add_cookie_str(&cookie_str, &uri);
+            }
+        }
         Ok(())
     }
 
@@ -346,7 +415,7 @@ impl RClient {
     /// # Errors
     ///
     /// * `PyException` - If there is an error making the request.
-    #[pyo3(signature = (method, url, params=None, headers=None, _cookies=None, content=None,
+    #[pyo3(signature = (method, url, params=None, headers=None, cookies=None, content=None,
         data=None, json=None, files=None, auth=None, auth_bearer=None, timeout=None))]
     fn request(
         &self,
@@ -355,7 +424,7 @@ impl RClient {
         url: &str,
         params: Option<IndexMapSSR>,
         headers: Option<IndexMapSSR>,
-        _cookies: Option<IndexMapSSR>,
+        cookies: Option<IndexMapSSR>,
         content: Option<Vec<u8>>,
         data: Option<&Bound<'_, PyAny>>,
         json: Option<&Bound<'_, PyAny>>,
@@ -386,6 +455,18 @@ impl RClient {
             // Headers
             if let Some(headers) = headers {
                 request_builder = request_builder.headers(headers.to_headermap());
+            }
+
+            // Cookies - convert to Cookie header
+            if let Some(cookies) = cookies {
+                if !cookies.is_empty() {
+                    let cookie_value = cookies
+                        .iter()
+                        .map(|(k, v)| format!("{}={}", k, v))
+                        .collect::<Vec<_>>()
+                        .join("; ");
+                    request_builder = request_builder.header("Cookie", cookie_value);
+                }
             }
 
             // Only if method POST || PUT || PATCH
@@ -488,7 +569,7 @@ impl RClient {
 
         // Cookie_store
         if self.cookie_store.unwrap_or(true) {
-            client_builder = client_builder.cookie_store(true);
+            client_builder = client_builder.cookie_provider(self.cookie_jar.clone());
         }
 
         // Referer
@@ -516,7 +597,9 @@ impl RClient {
 
         // Ca_cert_file
         if let Some(ca_bundle_path) = &self.ca_cert_file {
-            std::env::set_var("PRIMP_CA_BUNDLE", ca_bundle_path);
+            unsafe {
+                std::env::set_var("PRIMP_CA_BUNDLE", ca_bundle_path);
+            }
         }
 
         // Verify
@@ -536,6 +619,24 @@ impl RClient {
         // Http2_only
         if let Some(true) = self.http2_only {
             client_builder = client_builder.http2_only();
+        }
+
+        // Performance optimization: Connection pool settings
+        if let Some(timeout) = self.pool_idle_timeout {
+            client_builder = client_builder.pool_idle_timeout(Duration::from_secs_f64(timeout));
+        }
+
+        if let Some(max_idle) = self.pool_max_idle_per_host {
+            client_builder = client_builder.pool_max_idle_per_host(max_idle);
+        }
+
+        // TCP optimization
+        if let Some(true) = self.tcp_nodelay {
+            client_builder = client_builder.tcp_nodelay(true);
+        }
+
+        if let Some(interval) = self.tcp_keepalive {
+            client_builder = client_builder.tcp_keepalive(Some(Duration::from_secs_f64(interval)));
         }
 
         // Build and replace client

@@ -17,7 +17,9 @@
       "Bash(cargo search:*)",
       "Bash(cargo info:*)",
       "Bash(python:*)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(iconv:*)",
+      "Bash(pip install:*)"
     ],
     "deny": [],
     "ask": []

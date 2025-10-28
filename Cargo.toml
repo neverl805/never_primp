@@ -1,7 +1,7 @@
 [package]
 name = "primp"
-version = "0.15.1"
-edition = "2021"
+version = "1.0.0"
+edition = "2024"
 description = "HTTP client that can impersonate web browsers, mimicking their headers and `TLS/JA3/JA4/HTTP2` fingerprints"
 authors = ["Neverland"]
 
@@ -27,8 +27,7 @@ wreq = { version = "6.0.0-rc.20", features = [
     "multipart",
     "stream",
 ] }
-wreq-util = "3.0.0-rc.3"
-url = "2.5"
+wreq-util = "3.0.0-rc.6"
 encoding_rs = { version = "0.8.35" }
 foldhash = "0.1.5"
 indexmap = { version = "2.9.0", features = ["serde"] }

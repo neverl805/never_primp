@@ -47,6 +47,14 @@ class Client(RClient):
             ca_cert_file: str | None = None,
             https_only: bool | None = False,
             http2_only: bool | None = False,
+            # Performance optimization parameters
+            pool_idle_timeout: float | None = None,
+            pool_max_idle_per_host: int | None = None,
+            tcp_nodelay: bool | None = None,
+            tcp_keepalive: float | None = None,
+            # Retry mechanism
+            retry_count: int | None = None,
+            retry_backoff: float | None = None,
     ):
         """
         Args:
@@ -118,8 +126,32 @@ class Client(RClient):
 
 
 class AsyncClient(Client):
-    def __init__(self, *args, **kwargs):
-        super().__init__(*args, **kwargs)
+    def __init__(self,
+                 auth: tuple[str, str | None] | None = None,
+                 auth_bearer: str | None = None,
+                 params: dict[str, str] | None = None,
+                 headers: dict[str, str] | None = None,
+                 cookie_store: bool | None = True,
+                 referer: bool | None = True,
+                 proxy: str | None = None,
+                 timeout: float | None = 30,
+                 impersonate: IMPERSONATE | None = None,
+                 impersonate_os: IMPERSONATE_OS | None = None,
+                 follow_redirects: bool | None = True,
+                 max_redirects: int | None = 20,
+                 verify: bool | None = True,
+                 ca_cert_file: str | None = None,
+                 https_only: bool | None = False,
+                 http2_only: bool | None = False,
+                 # Performance optimization parameters
+                 pool_idle_timeout: float | None = None,
+                 pool_max_idle_per_host: int | None = None,
+                 tcp_nodelay: bool | None = None,
+                 tcp_keepalive: float | None = None,
+                 # Retry mechanism
+                 retry_count: int | None = None,
+                 retry_backoff: float | None = None):
+        super().__init__()
 
     async def __aenter__(self) -> AsyncClient:
         return self
