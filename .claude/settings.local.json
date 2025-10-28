@@ -1,0 +1,21 @@
+{
+  "permissions": {
+    "allow": [
+      "WebSearch",
+      "WebFetch(domain:crates.io)",
+      "WebFetch(domain:github.com)",
+      "Bash(cargo tree:*)",
+      "Bash(cargo doc:*)",
+      "WebFetch(domain:docs.rs)",
+      "Bash(cargo check:*)",
+      "Bash(cargo build:*)",
+      "Bash(cargo update:*)",
+      "Bash(maturin build:*)"
+    ],
+    "deny": [],
+    "ask": []
+  },
+  "env":{
+    "MAX THINKING TOKENS":"32000"
+  }
+}
