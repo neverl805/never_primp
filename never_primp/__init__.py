@@ -14,7 +14,7 @@ else:
 from .never_primp import RClient
 
 if TYPE_CHECKING:
-    from .primp import IMPERSONATE, IMPERSONATE_OS, ClientRequestParams, HttpMethod, RequestParams, Response
+    from .never_primp import IMPERSONATE, IMPERSONATE_OS, ClientRequestParams, HttpMethod, RequestParams, Response
 else:
 
     class _Unpack:
