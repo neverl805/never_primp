@@ -30,23 +30,23 @@ class Client(RClient):
     """Initializes an HTTP client that can impersonate web browsers."""
 
     def __init__(
-        self,
-        auth: tuple[str, str | None] | None = None,
-        auth_bearer: str | None = None,
-        params: dict[str, str] | None = None,
-        headers: dict[str, str] | None = None,
-        cookie_store: bool | None = True,
-        referer: bool | None = True,
-        proxy: str | None = None,
-        timeout: float | None = 30,
-        impersonate: IMPERSONATE | None = None,
-        impersonate_os: IMPERSONATE_OS | None = None,
-        follow_redirects: bool | None = True,
-        max_redirects: int | None = 20,
-        verify: bool | None = True,
-        ca_cert_file: str | None = None,
-        https_only: bool | None = False,
-        http2_only: bool | None = False,
+            self,
+            auth: tuple[str, str | None] | None = None,
+            auth_bearer: str | None = None,
+            params: dict[str, str] | None = None,
+            headers: dict[str, str] | None = None,
+            cookie_store: bool | None = True,
+            referer: bool | None = True,
+            proxy: str | None = None,
+            timeout: float | None = 30,
+            impersonate: IMPERSONATE | None = None,
+            impersonate_os: IMPERSONATE_OS | None = None,
+            follow_redirects: bool | None = True,
+            max_redirects: int | None = 20,
+            verify: bool | None = True,
+            ca_cert_file: str | None = None,
+            https_only: bool | None = False,
+            http2_only: bool | None = False,
     ):
         """
         Args:
@@ -157,13 +157,13 @@ class AsyncClient(Client):
 
 
 def request(
-    method: HttpMethod,
-    url: str,
-    impersonate: IMPERSONATE | None = None,
-    impersonate_os: IMPERSONATE_OS | None = None,
-    verify: bool | None = True,
-    ca_cert_file: str | None = None,
-    **kwargs: Unpack[RequestParams],
+        method: HttpMethod,
+        url: str,
+        impersonate: IMPERSONATE | None = None,
+        impersonate_os: IMPERSONATE_OS | None = None,
+        verify: bool | None = True,
+        ca_cert_file: str | None = None,
+        **kwargs: Unpack[RequestParams],
 ):
     """
     Args:
@@ -201,10 +201,10 @@ def request(
         files: a map of file fields to file paths to be sent as multipart/form-data. Default is None.
     """
     with Client(
-        impersonate=impersonate,
-        impersonate_os=impersonate_os,
-        verify=verify,
-        ca_cert_file=ca_cert_file,
+            impersonate=impersonate,
+            impersonate_os=impersonate_os,
+            verify=verify,
+            ca_cert_file=ca_cert_file,
     ) as client:
         return client.request(method, url, **kwargs)
 

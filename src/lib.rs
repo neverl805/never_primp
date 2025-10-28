@@ -60,6 +60,16 @@ pub struct RClient {
     impersonate: Option<String>,
     #[pyo3(get)]
     impersonate_os: Option<String>,
+    // Configuration fields for client rebuild
+    headers: Arc<Mutex<Option<IndexMapSSR>>>,
+    cookie_store: Option<bool>,
+    referer: Option<bool>,
+    follow_redirects: Option<bool>,
+    max_redirects: Option<usize>,
+    verify: Option<bool>,
+    ca_cert_file: Option<String>,
+    https_only: Option<bool>,
+    http2_only: Option<bool>,
 }
 
 #[pymethods]
@@ -154,8 +164,8 @@ impl RClient {
         }
 
         // Headers
-        if let Some(headers) = headers {
-            let headers_headermap = headers.to_headermap();
+        if let Some(ref hdrs) = headers {
+            let headers_headermap = hdrs.to_headermap();
             client_builder = client_builder.default_headers(headers_headermap);
         };
 
@@ -222,26 +232,52 @@ impl RClient {
             timeout,
             impersonate,
             impersonate_os,
+            // Store configuration for potential client rebuild
+            headers: Arc::new(Mutex::new(headers)),
+            cookie_store,
+            referer,
+            follow_redirects,
+            max_redirects,
+            verify,
+            ca_cert_file,
+            https_only,
+            http2_only,
         })
     }
 
     #[getter]
     pub fn get_headers(&self) -> Result<IndexMapSSR> {
-        // Note: wreq does not provide direct access to headers like rquest
-        // Returning empty map for now
-        Ok(IndexMap::with_capacity_and_hasher(10, RandomState::default()))
+        if let Ok(headers_guard) = self.headers.lock() {
+            Ok(headers_guard.clone().unwrap_or_else(|| IndexMap::with_capacity_and_hasher(10, RandomState::default())))
+        } else {
+            Ok(IndexMap::with_capacity_and_hasher(10, RandomState::default()))
+        }
     }
 
     #[setter]
-    pub fn set_headers(&self, _new_headers: Option<IndexMapSSR>) -> Result<()> {
-        // Note: wreq does not support dynamically changing headers after client creation
-        // This functionality is not available in wreq
+    pub fn set_headers(&mut self, new_headers: Option<IndexMapSSR>) -> Result<()> {
+        if let Ok(mut headers_guard) = self.headers.lock() {
+            *headers_guard = new_headers;
+        }
+        self.rebuild_client()?;
         Ok(())
     }
 
-    pub fn headers_update(&self, _new_headers: Option<IndexMapSSR>) -> Result<()> {
-        // Note: wreq does not support dynamically changing headers after client creation
-        // This functionality is not available in wreq
+    pub fn headers_update(&mut self, new_headers: Option<IndexMapSSR>) -> Result<()> {
+        if let Some(new_headers) = new_headers {
+            if let Ok(mut headers_guard) = self.headers.lock() {
+                if let Some(existing_headers) = headers_guard.as_mut() {
+                    // Update existing headers
+                    for (key, value) in new_headers {
+                        existing_headers.insert(key, value);
+                    }
+                } else {
+                    // No existing headers, set new ones
+                    *headers_guard = Some(new_headers);
+                }
+            }
+            self.rebuild_client()?;
+        }
         Ok(())
     }
 
@@ -252,25 +288,22 @@ impl RClient {
 
     #[setter]
     pub fn set_proxy(&mut self, proxy: String) -> Result<()> {
-        // Note: wreq does not support dynamically changing proxy after client creation
-        // This only updates the stored value for future client recreation
         self.proxy = Some(proxy);
+        self.rebuild_client()?;
         Ok(())
     }
 
     #[setter]
     pub fn set_impersonate(&mut self, impersonate: String) -> Result<()> {
-        // Note: wreq does not support dynamically changing emulation after client creation
-        // This only updates the stored value for future client recreation
         self.impersonate = Some(impersonate);
+        self.rebuild_client()?;
         Ok(())
     }
 
     #[setter]
     pub fn set_impersonate_os(&mut self, impersonate_os: String) -> Result<()> {
-        // Note: wreq does not support dynamically changing emulation OS after client creation
-        // This only updates the stored value for future client recreation
         self.impersonate_os = Some(impersonate_os);
+        self.rebuild_client()?;
         Ok(())
     }
 
@@ -421,6 +454,97 @@ impl RClient {
             url,
             status_code,
         })
+    }
+}
+
+// Internal implementation (not exposed to Python)
+impl RClient {
+    /// Rebuilds the wreq client with current configuration
+    fn rebuild_client(&mut self) -> Result<()> {
+        let mut client_builder = wreq::Client::builder();
+
+        // Impersonate
+        if let Some(impersonate) = &self.impersonate {
+            let imp = Emulation::from_str(&impersonate.as_str())?;
+            let imp_os = if let Some(impersonate_os) = &self.impersonate_os {
+                EmulationOS::from_str(&impersonate_os.as_str())?
+            } else {
+                EmulationOS::default()
+            };
+            let emulation_option = EmulationOption::builder()
+                .emulation(imp)
+                .emulation_os(imp_os)
+                .build();
+            client_builder = client_builder.emulation(emulation_option);
+        }
+
+        // Headers
+        if let Ok(headers_guard) = self.headers.lock() {
+            if let Some(headers) = headers_guard.as_ref() {
+                let headers_headermap = headers.to_headermap();
+                client_builder = client_builder.default_headers(headers_headermap);
+            }
+        }
+
+        // Cookie_store
+        if self.cookie_store.unwrap_or(true) {
+            client_builder = client_builder.cookie_store(true);
+        }
+
+        // Referer
+        if self.referer.unwrap_or(true) {
+            client_builder = client_builder.referer(true);
+        }
+
+        // Proxy
+        let proxy = self.proxy.clone().or_else(|| std::env::var("PRIMP_PROXY").ok());
+        if let Some(proxy) = &proxy {
+            client_builder = client_builder.proxy(wreq::Proxy::all(proxy)?);
+        }
+
+        // Timeout
+        if let Some(seconds) = self.timeout {
+            client_builder = client_builder.timeout(Duration::from_secs_f64(seconds));
+        }
+
+        // Redirects
+        if self.follow_redirects.unwrap_or(true) {
+            client_builder = client_builder.redirect(Policy::limited(self.max_redirects.unwrap_or(20)));
+        } else {
+            client_builder = client_builder.redirect(Policy::none());
+        }
+
+        // Ca_cert_file
+        if let Some(ca_bundle_path) = &self.ca_cert_file {
+            std::env::set_var("PRIMP_CA_BUNDLE", ca_bundle_path);
+        }
+
+        // Verify
+        if self.verify.unwrap_or(true) {
+            if let Some(cert_store) = load_ca_certs() {
+                client_builder = client_builder.cert_store(cert_store.clone());
+            }
+        } else {
+            client_builder = client_builder.cert_verification(false);
+        }
+
+        // Https_only
+        if let Some(true) = self.https_only {
+            client_builder = client_builder.https_only(true);
+        }
+
+        // Http2_only
+        if let Some(true) = self.http2_only {
+            client_builder = client_builder.http2_only();
+        }
+
+        // Build and replace client
+        let new_client = client_builder.build()?;
+        if let Ok(mut client_guard) = self.client.lock() {
+            *client_guard = new_client;
+        }
+
+        Ok(())
     }
 }
 

@@ -1,4 +1,7 @@
 {
+  "env": {
+    "MAX THINKING TOKENS": "32000"
+  },
   "permissions": {
     "allow": [
       "WebSearch",
@@ -10,12 +13,13 @@
       "Bash(cargo check:*)",
       "Bash(cargo build:*)",
       "Bash(cargo update:*)",
-      "Bash(maturin build:*)"
+      "Bash(maturin build:*)",
+      "Bash(cargo search:*)",
+      "Bash(cargo info:*)",
+      "Bash(python:*)",
+      "Bash(python3:*)"
     ],
     "deny": [],
     "ask": []
-  },
-  "env":{
-    "MAX THINKING TOKENS":"32000"
   }
 }
