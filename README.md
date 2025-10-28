@@ -1,6 +1,6 @@
 ![Python >= 3.8](https://img.shields.io/badge/python->=3.8-red.svg) [![](https://badgen.net/github/release/deedy5/pyreqwest-impersonate)](https://github.com/deedy5/pyreqwest-impersonate/releases) [![](https://badge.fury.io/py/primp.svg)](https://pypi.org/project/primp) [![Downloads](https://static.pepy.tech/badge/primp/week)](https://pepy.tech/project/primp) [![CI](https://github.com/deedy5/pyreqwest-impersonate/actions/workflows/CI.yml/badge.svg?branch=main)](https://github.com/deedy5/pyreqwest-impersonate/actions/workflows/CI.yml)
-# 🪞PRIMP
-**🪞PRIMP** = **P**ython **R**equests **IMP**ersonate
+# 🪞NEVER_PRIMP
+**🪞NEVER_PRIMP** = **P**ython **R**equests **IMP**ersonate
 
 The fastest python HTTP client that can impersonate web browsers.</br>
 Provides precompiled wheels:</br>
@@ -26,7 +26,7 @@ Provides precompiled wheels:</br>
 ## Installation
 
 ```python
-pip install -U primp
+pip install -U never_primp
 ```
 
 ## Key Features
@@ -59,10 +59,6 @@ pip install -U primp
 - Impersonate Chrome, Safari, Edge, Firefox, OkHttp
 - Mimic TLS/JA3/JA4/HTTP2 fingerprints
 - Custom OS impersonation (Windows, macOS, Linux, Android, iOS)
-
-## Benchmark
-
-![](https://github.com/deedy5/primp/blob/main/benchmark.jpg?raw=true)
 
 ## Usage
 ### I. Client
