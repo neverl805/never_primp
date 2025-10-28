@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Cookie 管理示例和工具类"""
 
-import primp
+import never_primp as primp
 from http.cookies import SimpleCookie
 from typing import Dict, Optional, Any
 

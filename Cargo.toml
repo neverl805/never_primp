@@ -1,14 +1,14 @@
 [package]
-name = "primp"
+name = "never_primp"
 version = "1.0.0"
 edition = "2024"
-description = "HTTP client that can impersonate web browsers, mimicking their headers and `TLS/JA3/JA4/HTTP2` fingerprints"
+description = "基于原primp 重新优化调整的请求库"
 authors = ["Neverland"]
 
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 [lib]
-name = "primp"
+name = "never_primp"
 crate-type = ["cdylib"]
 
 [dependencies]

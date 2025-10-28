@@ -4,7 +4,7 @@ import asyncio
 # import aiohttp
 from curl_cffi import requests as curl_requests
 import requests_go
-import primp
+import never_primp as primp
 
 
 URL = "https://www.baidu.com"   # 你可以改成任意测试接口

@@ -1,4 +1,4 @@
-import primp
+import never_primp as primp
 
 # Automatic cookie management (default)
 url = 'https://ip.smartdaili-china.com/json'

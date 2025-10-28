@@ -724,6 +724,31 @@ dependencies = [
 ]
 
 [[package]]
+name = "never_primp"
+version = "1.0.0"
+dependencies = [
+ "anyhow",
+ "encoding_rs",
+ "foldhash",
+ "html2text",
+ "http",
+ "http-body-util",
+ "indexmap",
+ "mime",
+ "pyo3",
+ "pyo3-log",
+ "pythonize",
+ "rand 0.9.0",
+ "rustls-native-certs",
+ "serde_json",
+ "tokio",
+ "tokio-util",
+ "tracing",
+ "wreq",
+ "wreq-util",
+]
+
+[[package]]
 name = "new_debug_unreachable"
 version = "1.0.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -879,31 +904,6 @@ name = "precomputed-hash"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "925383efa346730478fb4838dbe9137d2a47675ad789c546d150a6e1dd4ab31c"
-
-[[package]]
-name = "primp"
-version = "1.0.0"
-dependencies = [
- "anyhow",
- "encoding_rs",
- "foldhash",
- "html2text",
- "http",
- "http-body-util",
- "indexmap",
- "mime",
- "pyo3",
- "pyo3-log",
- "pythonize",
- "rand 0.9.0",
- "rustls-native-certs",
- "serde_json",
- "tokio",
- "tokio-util",
- "tracing",
- "wreq",
- "wreq-util",
-]
 
 [[package]]
 name = "proc-macro2"

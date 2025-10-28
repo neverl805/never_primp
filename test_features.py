@@ -2,7 +2,7 @@
 # -*- coding: utf-8 -*-
 """Test enhanced features: headers, proxy, impersonate setters"""
 
-import primp
+import never_primp as primp
 
 def test_headers():
     """Test get_headers, set_headers, and headers_update"""

@@ -192,15 +192,15 @@ resp.url
 
 ##### Impersonate
 
-- Chrome: `chrome_100`，`chrome_101`，`chrome_104`，`chrome_105`，`chrome_106`，`chrome_107`，`chrome_108`，`chrome_109`，`chrome_114`，`chrome_116`，`chrome_117`，`chrome_118`，`chrome_119`，`chrome_120`，`chrome_123`，`chrome_124`，`chrome_126`，`chrome_127`，`chrome_128`，`chrome_129`，`chrome_130`，`chrome_131`, `chrome_133`
+- Chrome: `chrome_100`，`chrome_101`，`chrome_104`，`chrome_105`，`chrome_106`，`chrome_107`，`chrome_108`，`chrome_109`，`chrome_114`，`chrome_116`，`chrome_117`，`chrome_118`，`chrome_119`，`chrome_120`，`chrome_123`，`chrome_124`，`chrome_126`，`chrome_127`，`chrome_128`，`chrome_129`，`chrome_130`，`chrome_131`, `chrome_133`, `chrome_134`, `chrome_135`, `chrome_136`, `chrome_137`, `chrome_138`, `chrome_139`, `chrome_140`, `chrome_141`
 
-- Edge: `edge_101`，`edge_122`，`edge_127`, `edge_131`
+- Edge: `edge_101`，`edge_122`，`edge_127`, `edge_131`, `edge_134`
 
-- Safari: `safari_ios_17.2`，`safari_ios_17.4.1`，`safari_ios_16.5`，`safari_ios_18.1.1`, `safari_15.3`，`safari_15.5`，`safari_15.6.1`，`safari_16`，`safari_16.5`，`safari_17.0`，`safari_17.2.1`，`safari_17.4.1`，`safari_17.5`，`safari_18`，`safari_18.2`, `safari_ipad_18`
+- Safari: `safari_ios_17.2`，`safari_ios_17.4.1`，`safari_ios_16.5`，`safari_ios_18.1.1`, `safari_15.3`，`safari_15.5`，`safari_15.6.1`，`safari_16`，`safari_16.5`，`safari_17.0`，`safari_17.2.1`，`safari_17.4.1`，`safari_17.5`，`safari_18`，`safari_18.2`, `safari_ipad_18`, `safari_ipad_26`, `safari_ios_26`, `safari_26`
 
 - OkHttp: `okhttp_3.9`，`okhttp_3.11`，`okhttp_3.13`，`okhttp_3.14`，`okhttp_4.9`，`okhttp_4.10`，`okhttp_5`
 
-- Firefox: `firefox_109`, `firefox_117`, `firefox_128`, `firefox_133`, `firefox_135`
+- Firefox: `firefox_109`, `firefox_117`, `firefox_128`, `firefox_133`, `firefox_135`, `firefox_136`, `firefox_139`, `firefox_142`, `firefox_143`
 
 ##### Impersonate OS
 
@@ -209,7 +209,7 @@ resp.url
 #### Examples
 
 ```python
-import primp
+import never_primp as primp
 
 # Impersonate
 client = primp.Client(impersonate="chrome_131", impersonate_os="windows")
@@ -312,7 +312,7 @@ resp = primp.get("https://httpbin.org/anything", impersonate="chrome_131", imper
 import asyncio
 import logging
 
-import primp
+import never_primp as primp
 
 async def aget_text(url):
     async with primp.AsyncClient(impersonate="chrome_131") as client:
