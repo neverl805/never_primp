@@ -74,7 +74,7 @@ jobs:
             # 检测包管理器并安装依赖
             if command -v yum &> /dev/null; then
               echo "Using yum (manylinux container)"
-              yum install -y clang-devel llvm-devel cmake
+              yum install -y clang llvm-devel cmake gcc gcc-c++ glibc-devel glibc-headers kernel-headers
             elif command -v apt-get &> /dev/null; then
               echo "Using apt-get (Ubuntu host)"
               echo "Dependencies already installed on host"
