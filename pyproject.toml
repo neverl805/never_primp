@@ -49,5 +49,5 @@ Repository = "https://github.com/Neverland/never_primp"
 "Bug Tracker" = "https://github.com/Neverland/never_primp/issues"
 
 [tool.maturin]
-module-name = "never_primp.never_primp"
 features = ["pyo3/extension-module"]
+python-source = "."

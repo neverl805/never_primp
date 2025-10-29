@@ -79,11 +79,16 @@ jobs:
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
+        env:
+          CC: ${{ matrix.target == 'aarch64' && 'aarch64-linux-gnu-gcc' || '' }}
+          CXX: ${{ matrix.target == 'aarch64' && 'aarch64-linux-gnu-g++' || '' }}
+          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.target == 'aarch64' && 'aarch64-linux-gnu-gcc' || '' }}
+          BINDGEN_EXTRA_CLANG_ARGS: ${{ matrix.target == 'aarch64' && '--sysroot=/usr/aarch64-linux-gnu' || '' }}
         with:
           target: ${{ matrix.target }}
           args: --release --out dist --find-interpreter
           sccache: 'true'
-          manylinux: ${{ matrix.target == 'x86_64' && '2_28' || 'auto' }}
+          manylinux: ${{ matrix.target == 'x86_64' && '2_28' || 'off' }}
           before-script-linux: |
             # 检测包管理器并安装依赖
             if command -v yum &> /dev/null; then
