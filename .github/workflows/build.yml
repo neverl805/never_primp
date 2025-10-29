@@ -42,8 +42,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies (x86_64 only)
-        if: matrix.target == 'x86_64'
+      - name: Install dependencies
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -55,8 +54,7 @@ jobs:
             gcc-multilib \
             libssl-dev
 
-      - name: Find and set libclang path (x86_64 only)
-        if: matrix.target == 'x86_64'
+      - name: Find and set libclang path
         run: |
           # 查找 libclang.so 并设置环境变量
           LIBCLANG_PATH=$(find /usr/lib -name "libclang.so*" | head -1 | xargs dirname)
@@ -76,14 +74,18 @@ jobs:
             if command -v yum &> /dev/null; then
               echo "Using yum (manylinux container)"
               yum install -y clang llvm-devel cmake glibc-devel glibc-headers kernel-headers
-            elif command -v apt-get &> /dev/null; then
-              echo "Using apt-get (Ubuntu host)"
-              echo "Dependencies already installed on host"
-            fi
 
-            # 查找并设置 libclang (使用参数展开避免未绑定变量错误)
-            export LIBCLANG_PATH="${LIBCLANG_PATH:-$(find /usr/lib* -name "libclang.so*" 2>/dev/null | head -1 | xargs dirname 2>/dev/null || echo "/usr/lib64")}"
-            echo "Using LIBCLANG_PATH=$LIBCLANG_PATH"
+              # 设置 bindgen 的 clang 参数，确保能找到系统头文件
+              ARCH=$(uname -m)
+              export BINDGEN_EXTRA_CLANG_ARGS="-I/usr/include -I/usr/include/$ARCH-linux-gnu"
+              echo "BINDGEN_EXTRA_CLANG_ARGS=$BINDGEN_EXTRA_CLANG_ARGS"
+
+              # 查找并设置 libclang
+              export LIBCLANG_PATH="${LIBCLANG_PATH:-$(find /usr/lib* -name "libclang.so*" 2>/dev/null | head -1 | xargs dirname 2>/dev/null || echo "/usr/lib64")}"
+              echo "Using LIBCLANG_PATH=$LIBCLANG_PATH"
+            else
+              echo "Not in manylinux container, using host dependencies"
+            fi
 
             # 验证
             ls -la $LIBCLANG_PATH/libclang* 2>/dev/null || echo "libclang not found, relying on system defaults"
