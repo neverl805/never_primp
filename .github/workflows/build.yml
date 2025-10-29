@@ -42,7 +42,8 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies (common)
+      - name: Install dependencies (x86_64 only)
+        if: matrix.target == 'x86_64'
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -53,7 +54,8 @@ jobs:
             pkg-config \
             libssl-dev
 
-      - name: Find and set libclang path
+      - name: Find and set libclang path (x86_64 only)
+        if: matrix.target == 'x86_64'
         run: |
           # 查找 libclang.so 并设置环境变量
           LIBCLANG_PATH=$(find /usr/lib -name "libclang.so*" | head -1 | xargs dirname)
@@ -61,39 +63,24 @@ jobs:
           echo "Found libclang at: $LIBCLANG_PATH"
           ls -la $LIBCLANG_PATH/libclang.so* || true
 
-      - name: Install aarch64 cross-compilation tools
-        if: matrix.target == 'aarch64'
-        run: |
-          sudo apt-get install -y \
-            gcc-aarch64-linux-gnu \
-            g++-aarch64-linux-gnu \
-            libc6-dev-arm64-cross
-
-      - name: Set aarch64 environment variables
-        if: matrix.target == 'aarch64'
-        run: |
-          echo "CC=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-          echo "CXX=aarch64-linux-gnu-g++" >> $GITHUB_ENV
-          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
-          echo "BINDGEN_EXTRA_CLANG_ARGS=--sysroot=/usr/aarch64-linux-gnu" >> $GITHUB_ENV
-
       - name: Build wheels
         uses: PyO3/maturin-action@v1
-        env:
-          CC: ${{ matrix.target == 'aarch64' && 'aarch64-linux-gnu-gcc' || '' }}
-          CXX: ${{ matrix.target == 'aarch64' && 'aarch64-linux-gnu-g++' || '' }}
-          CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER: ${{ matrix.target == 'aarch64' && 'aarch64-linux-gnu-gcc' || '' }}
-          BINDGEN_EXTRA_CLANG_ARGS: ${{ matrix.target == 'aarch64' && '--sysroot=/usr/aarch64-linux-gnu' || '' }}
         with:
           target: ${{ matrix.target }}
           args: --release --out dist --find-interpreter
           sccache: 'true'
-          manylinux: ${{ matrix.target == 'x86_64' && '2_28' || 'off' }}
+          manylinux: ${{ matrix.target == 'x86_64' && '2_28' || '2_28' }}
           before-script-linux: |
             # 检测包管理器并安装依赖
             if command -v yum &> /dev/null; then
               echo "Using yum (manylinux container)"
               yum install -y clang-devel llvm-devel cmake
+
+              # aarch64 需要安装交叉编译工具链
+              if [ "$AUDITWHEEL_PLAT" == "manylinux_2_28_aarch64" ]; then
+                echo "Installing aarch64 cross-compilation toolchain"
+                yum install -y gcc-aarch64-linux-gnu gcc-c++-aarch64-linux-gnu
+              fi
             elif command -v apt-get &> /dev/null; then
               echo "Using apt-get (Ubuntu host)"
               # 依赖已在主机安装，无需重复
