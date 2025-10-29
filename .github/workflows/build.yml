@@ -83,15 +83,29 @@ jobs:
           target: ${{ matrix.target }}
           args: --release --out dist --find-interpreter
           sccache: 'true'
-          manylinux: auto
+          manylinux: ${{ matrix.target == 'x86_64' && '2_28' || 'auto' }}
           before-script-linux: |
-            # 在 manylinux 容器中安装依赖
-            yum install -y clang-devel cmake3
+            # 检测包管理器并安装依赖
+            if command -v yum &> /dev/null; then
+              echo "Using yum (manylinux container)"
+              yum install -y clang-devel llvm-devel cmake
+            elif command -v apt-get &> /dev/null; then
+              echo "Using apt-get (Ubuntu host)"
+              # 依赖已在主机安装，无需重复
+              echo "Dependencies already installed on host"
+            fi
+
             # 查找并设置 libclang
-            export LIBCLANG_PATH=$(find /usr/lib* -name "libclang.so*" 2>/dev/null | head -1 | xargs dirname 2>/dev/null || echo "/usr/lib64")
-            echo "LIBCLANG_PATH=$LIBCLANG_PATH"
-        env:
-          LIBCLANG_PATH: ${{ env.LIBCLANG_PATH }}
+            if [ -n "$LIBCLANG_PATH" ]; then
+              echo "Using existing LIBCLANG_PATH=$LIBCLANG_PATH"
+            else
+              export LIBCLANG_PATH=$(find /usr/lib* -name "libclang.so*" 2>/dev/null | head -1 | xargs dirname 2>/dev/null || echo "/usr/lib64")
+              echo "Found LIBCLANG_PATH=$LIBCLANG_PATH"
+            fi
+
+            # 验证
+            ls -la $LIBCLANG_PATH/libclang* 2>/dev/null || echo "libclang not found, relying on system defaults"
+            clang --version 2>/dev/null || echo "clang not in PATH"
 
       - name: List built wheels
         run: ls -lh dist/
