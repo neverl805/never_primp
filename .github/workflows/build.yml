@@ -75,15 +75,8 @@ jobs:
             if command -v yum &> /dev/null; then
               echo "Using yum (manylinux container)"
               yum install -y clang-devel llvm-devel cmake
-
-              # aarch64 需要安装交叉编译工具链
-              if [ "$AUDITWHEEL_PLAT" == "manylinux_2_28_aarch64" ]; then
-                echo "Installing aarch64 cross-compilation toolchain"
-                yum install -y gcc-aarch64-linux-gnu gcc-c++-aarch64-linux-gnu
-              fi
             elif command -v apt-get &> /dev/null; then
               echo "Using apt-get (Ubuntu host)"
-              # 依赖已在主机安装，无需重复
               echo "Dependencies already installed on host"
             fi
 
