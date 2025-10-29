@@ -52,6 +52,7 @@ jobs:
             cmake \
             build-essential \
             pkg-config \
+            gcc-multilib \
             libssl-dev
 
       - name: Find and set libclang path (x86_64 only)
@@ -78,6 +79,7 @@ jobs:
             elif command -v apt-get &> /dev/null; then
               echo "Using apt-get (Ubuntu host)"
               echo "Dependencies already installed on host"
+              sudo apt-get install -y llvm-devel gcc gcc-c++ glibc-devel glibc-headers kernel-headers
             fi
 
             # 查找并设置 libclang (使用参数展开避免未绑定变量错误)
