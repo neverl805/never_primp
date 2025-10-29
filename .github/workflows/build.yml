@@ -13,13 +13,10 @@ on:
           - 'false'
           - 'true'
 
-  # 当推送 tag 时自动触发并发布
+  # 推送触发：tag 或分支
   push:
     tags:
       - 'v*.*.*'
-
-  # 推送到 main 分支时仅构建不发布
-  push:
     branches:
       - main
       - master
