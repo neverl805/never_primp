@@ -56,6 +56,12 @@ jobs:
       - name: List built wheels
         run: ls -lh dist/
 
+      - name: Test wheel (x86_64 only)
+        if: matrix.target == 'x86_64'
+        run: |
+          pip install never_primp --no-index --find-links dist --force-reinstall
+          python -c "import never_primp; print('✅ Import test passed')"
+
       - name: Upload wheels
         uses: actions/upload-artifact@v4
         with:
@@ -87,6 +93,11 @@ jobs:
 
       - name: List built wheels
         run: dir dist
+
+      - name: Test wheel
+        run: |
+          pip install never_primp --no-index --find-links dist --force-reinstall
+          python -c "import never_primp; print('✅ Import test passed')"
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
@@ -120,6 +131,12 @@ jobs:
 
       - name: List built wheels
         run: ls -lh dist/
+
+      - name: Test wheel (x86_64 only)
+        if: matrix.target == 'x86_64'
+        run: |
+          pip install never_primp --no-index --find-links dist --force-reinstall
+          python -c "import never_primp; print('✅ Import test passed')"
 
       - name: Upload wheels
         uses: actions/upload-artifact@v4
