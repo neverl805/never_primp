@@ -1,0 +1,54 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "never_primp"
+version = "1.0.0"
+description = "基于原primp 重新优化调整的请求库 - The fastest python HTTP client that can impersonate web browsers"
+readme = "README.md"
+requires-python = ">=3.8"
+license = { file = "LICENSE" }
+authors = [
+    { name = "Neverland" }
+]
+keywords = [
+    "requests",
+    "httpx",
+    "http",
+    "http-client",
+    "tls-fingerprint",
+    "ja3",
+    "ja4",
+    "impersonate",
+    "browser-impersonation",
+    "web-scraping",
+    "crawler",
+    "reverse-engineering"
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Intended Audience :: Developers",
+    "License :: OSI Approved :: MIT License",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: Implementation :: CPython",
+    "Programming Language :: Rust",
+    "Topic :: Internet :: WWW/HTTP",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+]
+
+[project.urls]
+Homepage = "https://github.com/Neverland/never_primp"
+Repository = "https://github.com/Neverland/never_primp"
+"Bug Tracker" = "https://github.com/Neverland/never_primp/issues"
+
+[tool.maturin]
+python-source = "."
+module-name = "never_primp.never_primp"
+features = ["pyo3/extension-module"]
