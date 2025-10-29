@@ -20,7 +20,8 @@
       "Bash(python3:*)",
       "Bash(iconv:*)",
       "Bash(pip install:*)",
-      "Bash(pip show:*)"
+      "Bash(pip show:*)",
+      "Bash(cat:*)"
     ],
     "deny": [],
     "ask": []

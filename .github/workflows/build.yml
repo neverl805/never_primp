@@ -42,7 +42,7 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Install dependencies
+      - name: Install dependencies (common)
         run: |
           sudo apt-get update
           sudo apt-get install -y \
@@ -53,6 +53,30 @@ jobs:
             pkg-config \
             libssl-dev
 
+      - name: Find and set libclang path
+        run: |
+          # 查找 libclang.so 并设置环境变量
+          LIBCLANG_PATH=$(find /usr/lib -name "libclang.so*" | head -1 | xargs dirname)
+          echo "LIBCLANG_PATH=$LIBCLANG_PATH" >> $GITHUB_ENV
+          echo "Found libclang at: $LIBCLANG_PATH"
+          ls -la $LIBCLANG_PATH/libclang.so* || true
+
+      - name: Install aarch64 cross-compilation tools
+        if: matrix.target == 'aarch64'
+        run: |
+          sudo apt-get install -y \
+            gcc-aarch64-linux-gnu \
+            g++-aarch64-linux-gnu \
+            libc6-dev-arm64-cross
+
+      - name: Set aarch64 environment variables
+        if: matrix.target == 'aarch64'
+        run: |
+          echo "CC=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "CXX=aarch64-linux-gnu-g++" >> $GITHUB_ENV
+          echo "CARGO_TARGET_AARCH64_UNKNOWN_LINUX_GNU_LINKER=aarch64-linux-gnu-gcc" >> $GITHUB_ENV
+          echo "BINDGEN_EXTRA_CLANG_ARGS=--sysroot=/usr/aarch64-linux-gnu" >> $GITHUB_ENV
+
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
@@ -60,6 +84,14 @@ jobs:
           args: --release --out dist --find-interpreter
           sccache: 'true'
           manylinux: auto
+          before-script-linux: |
+            # 在 manylinux 容器中安装依赖
+            yum install -y clang-devel cmake3
+            # 查找并设置 libclang
+            export LIBCLANG_PATH=$(find /usr/lib* -name "libclang.so*" 2>/dev/null | head -1 | xargs dirname 2>/dev/null || echo "/usr/lib64")
+            echo "LIBCLANG_PATH=$LIBCLANG_PATH"
+        env:
+          LIBCLANG_PATH: ${{ env.LIBCLANG_PATH }}
 
       - name: List built wheels
         run: ls -lh dist/
@@ -101,6 +133,15 @@ jobs:
 
       - name: List built wheels
         run: dir dist
+
+      - name: Debug wheel contents
+        shell: powershell
+        run: |
+          $wheel = Get-ChildItem dist\*.whl | Select-Object -First 1
+          Write-Host "=== Wheel contents ==="
+          python -m zipfile -l $wheel
+          Write-Host "`n=== Looking for never_primp files ==="
+          python -m zipfile -l $wheel | Select-String "never_primp"
 
       - name: Test wheel
         run: |
