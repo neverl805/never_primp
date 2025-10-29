@@ -34,7 +34,7 @@ jobs:
       matrix:
         target:
           - x86_64        # Linux x64 (最常用)
-          - aarch64       # Linux ARM64 (服务器)
+#          - aarch64       # Linux ARM64 (服务器)
     steps:
       - uses: actions/checkout@v4
 
