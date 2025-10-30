@@ -3,7 +3,8 @@ from __future__ import annotations
 import asyncio
 import sys
 from functools import partial
-from typing import TYPE_CHECKING, TypedDict
+from typing import TYPE_CHECKING, TypedDict, Iterator
+from collections.abc import MutableMapping
 
 if sys.version_info <= (3, 11):
     from typing_extensions import Unpack
@@ -24,6 +25,112 @@ else:
 
     Unpack = _Unpack()
     RequestParams = ClientRequestParams = TypedDict
+
+
+class CookieJar(MutableMapping):
+    """
+    A dict-like container for managing HTTP cookies, compatible with requests.Session.cookies API.
+
+    Examples:
+        client = Client()
+
+        # Set cookies
+        client.cookies['session_id'] = 'abc123'
+        client.cookies['user_token'] = 'xyz789'
+
+        # Get cookies
+        value = client.cookies['session_id']
+        value = client.cookies.get('user_token', 'default')
+
+        # Update multiple cookies
+        client.cookies.update({'key1': 'value1', 'key2': 'value2'})
+
+        # Delete cookies
+        del client.cookies['session_id']
+
+        # Clear all cookies
+        client.cookies.clear()
+
+        # Check existence
+        if 'session_id' in client.cookies:
+            print("Session exists")
+
+        # Convert to dict
+        all_cookies = dict(client.cookies)
+    """
+
+    def __init__(self, client: RClient):
+        """Initialize CookieJar with a reference to the client."""
+        self._client = client
+
+    def __getitem__(self, name: str) -> str:
+        """Get a cookie value by name."""
+        value = self._client.get_cookie(name)
+        if value is None:
+            raise KeyError(name)
+        return value
+
+    def __setitem__(self, name: str, value: str) -> None:
+        """Set a cookie by name."""
+        self._client.set_cookie(name, value)
+
+    def __delitem__(self, name: str) -> None:
+        """Delete a cookie by name."""
+        # Check if cookie exists first
+        if self._client.get_cookie(name) is None:
+            raise KeyError(name)
+        self._client.delete_cookie(name)
+
+    def __iter__(self) -> Iterator[str]:
+        """Iterate over cookie names."""
+        return iter(self._client.get_all_cookies().keys())
+
+    def __len__(self) -> int:
+        """Return the number of cookies."""
+        return len(self._client.get_all_cookies())
+
+    def __contains__(self, name: object) -> bool:
+        """Check if a cookie exists."""
+        if not isinstance(name, str):
+            return False
+        return self._client.get_cookie(name) is not None
+
+    def __repr__(self) -> str:
+        """Return string representation of cookies."""
+        cookies = self._client.get_all_cookies()
+        return f"CookieJar({cookies})"
+
+    def get(self, name: str, default: str | None = None) -> str | None:
+        """Get a cookie value with a default fallback."""
+        value = self._client.get_cookie(name)
+        return value if value is not None else default
+
+    def update(self, cookies: dict[str, str], domain: str | None = None, path: str | None = None) -> None:
+        """
+        Update multiple cookies at once.
+
+        Args:
+            cookies: Dictionary of cookie names to values
+            domain: Optional domain for the cookies (e.g., ".example.com")
+            path: Optional path for the cookies (e.g., "/")
+        """
+        self._client.update_cookies(cookies, domain=domain, path=path)
+
+    def clear(self) -> None:
+        """Remove all cookies."""
+        self._client.clear_cookies()
+
+    def set(self, name: str, value: str, domain: str | None = None, path: str | None = None) -> None:
+        """
+        Set a single cookie with optional domain and path.
+
+        Args:
+            name: Cookie name
+            value: Cookie value
+            domain: Optional domain (e.g., ".example.com")
+            path: Optional path (e.g., "/")
+        """
+        self._client.set_cookie(name, value, domain=domain, path=path)
 
 
 class Client(RClient):
@@ -103,6 +210,35 @@ class Client(RClient):
             http2_only: if true - use only HTTP/2, if false - use only HTTP/1. Default is False.
         """
         super().__init__()
+        self._cookies_jar: CookieJar | None = None
+
+    @property
+    def cookies(self) -> CookieJar:
+        """
+        Access the cookie jar for dict-like cookie management.
+
+        Returns:
+            CookieJar: A dict-like container for managing cookies.
+
+        Examples:
+            # Set cookies
+            client.cookies['session_id'] = 'abc123'
+
+            # Get cookies
+            value = client.cookies['session_id']
+
+            # Update cookies
+            client.cookies.update({'key': 'value'})
+
+            # Delete cookies
+            del client.cookies['session_id']
+
+            # Clear all
+            client.cookies.clear()
+        """
+        if self._cookies_jar is None:
+            self._cookies_jar = CookieJar(self)
+        return self._cookies_jar
 
     def __enter__(self) -> Client:
         return self

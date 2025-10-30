@@ -1,5 +1,6 @@
 #![allow(clippy::too_many_arguments)]
 use std::sync::{Arc, LazyLock, Mutex};
+use std::collections::HashSet;
 use std::time::Duration;
 
 use anyhow::Result;
@@ -48,6 +49,8 @@ pub struct RClient {
     client: Arc<Mutex<wreq::Client>>,
     // Cookie jar for manual cookie management
     cookie_jar: Arc<wreq::cookie::Jar>,
+    // Track deleted cookies (workaround for wreq not filtering expired cookies in get_all())
+    deleted_cookies: Arc<Mutex<std::collections::HashSet<String>>>,
     #[pyo3(get, set)]
     auth: Option<(String, Option<String>)>,
     #[pyo3(get, set)]
@@ -287,6 +290,7 @@ impl RClient {
         Ok(RClient {
             client,
             cookie_jar,
+            deleted_cookies: Arc::new(Mutex::new(HashSet::new())),
             auth,
             auth_bearer,
             params,
@@ -415,31 +419,135 @@ impl RClient {
         Ok(())
     }
 
-    #[pyo3(signature = (url))]
-    #[allow(unused_variables)]
-    fn get_cookies(&self, url: &str) -> Result<IndexMapSSR> {
+    /// Get all cookies from the jar without requiring a URL.
+    /// Returns a dictionary of cookie names to values.
+    fn get_all_cookies(&self) -> Result<IndexMapSSR> {
         let mut cookies = IndexMap::with_capacity_and_hasher(10, RandomState::default());
+        let deleted = self.deleted_cookies.lock().unwrap();
 
-        // Get all cookies from the jar
-        // Note: wreq's get_all() returns all cookies regardless of URL
-        // To get URL-specific cookies, you would need to filter manually or use get(name, uri) per cookie
         for cookie in self.cookie_jar.get_all() {
-            cookies.insert(cookie.name().to_string(), cookie.value().to_string());
+            let name = cookie.name();
+            // Filter out deleted cookies
+            if !deleted.contains(name) {
+                cookies.insert(name.to_string(), cookie.value().to_string());
+            }
         }
-
         Ok(cookies)
     }
 
-    #[pyo3(signature = (url, cookies))]
-    fn set_cookies(&self, url: &str, cookies: Option<IndexMapSSR>) -> Result<()> {
-        if let Some(cookies) = cookies {
-            let uri: wreq::Uri = url.parse()?;
+    /// Set a single cookie without requiring a URL.
+    ///
+    /// # Arguments
+    /// * `name` - Cookie name
+    /// * `value` - Cookie value
+    /// * `domain` - Optional domain (e.g., ".example.com"). If None, uses a wildcard domain.
+    /// * `path` - Optional path (e.g., "/"). If None, uses "/".
+    #[pyo3(signature = (name, value, domain=None, path=None))]
+    fn set_cookie(
+        &self,
+        name: String,
+        value: String,
+        domain: Option<String>,
+        path: Option<String>,
+    ) -> Result<()> {
+        let domain = domain.unwrap_or_else(|| "0.0.0.0".to_string());
+        let path = path.unwrap_or_else(|| "/".to_string());
 
-            for (name, value) in cookies {
-                // Format as "name=value" cookie string
-                let cookie_str = format!("{}={}", name, value);
-                self.cookie_jar.add_cookie_str(&cookie_str, &uri);
+        // Construct a URL from domain and path
+        let url = format!("http://{}{}", domain, path);
+        let uri: wreq::Uri = url.parse()?;
+
+        let cookie_str = format!("{}={}", name, value);
+        self.cookie_jar.add_cookie_str(&cookie_str, &uri);
+
+        // Remove from deleted list
+        self.deleted_cookies.lock().unwrap().remove(&name);
+        Ok(())
+    }
+
+    /// Get a single cookie value by name.
+    /// Returns None if the cookie doesn't exist.
+    #[pyo3(signature = (name))]
+    fn get_cookie(&self, name: String) -> Result<Option<String>> {
+        // Check if deleted
+        if self.deleted_cookies.lock().unwrap().contains(&name) {
+            return Ok(None);
+        }
+
+        for cookie in self.cookie_jar.get_all() {
+            if cookie.name() == name {
+                return Ok(Some(cookie.value().to_string()));
             }
+        }
+        Ok(None)
+    }
+
+    /// Update multiple cookies at once without requiring a URL.
+    ///
+    /// # Arguments
+    /// * `cookies` - Dictionary of cookie names to values
+    /// * `domain` - Optional domain. If None, uses a wildcard domain.
+    /// * `path` - Optional path. If None, uses "/".
+    #[pyo3(signature = (cookies, domain=None, path=None))]
+    fn update_cookies(
+        &self,
+        cookies: IndexMapSSR,
+        domain: Option<String>,
+        path: Option<String>,
+    ) -> Result<()> {
+        let domain = domain.unwrap_or_else(|| "0.0.0.0".to_string());
+        let path = path.unwrap_or_else(|| "/".to_string());
+
+        let url = format!("http://{}{}", domain, path);
+        let uri: wreq::Uri = url.parse()?;
+
+        let mut deleted = self.deleted_cookies.lock().unwrap();
+        for (name, value) in cookies {
+            let cookie_str = format!("{}={}", name, value);
+            self.cookie_jar.add_cookie_str(&cookie_str, &uri);
+            // Remove from deleted list
+            deleted.remove(&name);
+        }
+        Ok(())
+    }
+
+    /// Delete a single cookie by name.
+    /// Sets the cookie to an empty value with Max-Age=0 to delete it.
+    #[pyo3(signature = (name))]
+    fn delete_cookie(&self, name: String) -> Result<()> {
+        // To delete a cookie, set it with an expiration in the past
+        let url = "http://0.0.0.0/";
+        let uri: wreq::Uri = url.parse()?;
+
+        // Set cookie with Max-Age=0 to delete it
+        let cookie_str = format!("{}=; Max-Age=0", name);
+        self.cookie_jar.add_cookie_str(&cookie_str, &uri);
+
+        // Add to deleted list
+        self.deleted_cookies.lock().unwrap().insert(name);
+        Ok(())
+    }
+
+    /// Clear all cookies from the jar.
+    /// Sets all cookies with Max-Age=0 to mark them as expired.
+    fn clear_cookies(&self) -> Result<()> {
+        // Get all cookie names first to avoid borrow issues
+        let cookie_names: Vec<String> = self.cookie_jar
+            .get_all()
+            .map(|c| c.name().to_string())
+            .collect();
+
+        // Set each cookie with Expires in the past to mark as deleted
+        let url = "http://0.0.0.0/";
+        let uri: wreq::Uri = url.parse()?;
+
+        let mut deleted = self.deleted_cookies.lock().unwrap();
+        for name in cookie_names {
+            // Use Expires with a date in the past (Unix epoch)
+            let cookie_str = format!("{}=; Expires=Thu, 01 Jan 1970 00:00:00 GMT; Max-Age=0", name);
+            self.cookie_jar.add_cookie_str(&cookie_str, &uri);
+            // Add to deleted list
+            deleted.insert(name);
         }
         Ok(())
     }
