@@ -141,7 +141,9 @@ class AsyncClient(Client):
                  auth_bearer: str | None = None,
                  params: dict[str, str] | None = None,
                  headers: dict[str, str] | None = None,
+                 ordered_headers: dict[str, str] | None = None,
                  cookie_store: bool | None = True,
+                 split_cookies: bool | None = False,
                  referer: bool | None = True,
                  proxy: str | None = None,
                  timeout: float | None = 30,
@@ -160,7 +162,8 @@ class AsyncClient(Client):
                  tcp_keepalive: float | None = None,
                  # Retry mechanism
                  retry_count: int | None = None,
-                 retry_backoff: float | None = None):
+                 retry_backoff: float | None = None,
+                 ):
         super().__init__()
 
     async def __aenter__(self) -> AsyncClient:

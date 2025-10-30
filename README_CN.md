@@ -8,7 +8,6 @@
 
 ![Python >= 3.8](https://img.shields.io/badge/python->=3.8-blue.svg)
 [![PyPI version](https://badge.fury.io/py/never-primp.svg)](https://pypi.org/project/never-primp)
-[![Downloads](https://static.pepy.tech/badge/never-primp/week)](https://pepy.tech/project/never-primp)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://www.rust-lang.org)
 
