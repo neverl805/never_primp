@@ -2,7 +2,7 @@ use anyhow::{Error, Ok, Result};
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 
-use wreq::header::{HeaderMap, HeaderName, HeaderValue};
+use wreq::header::{HeaderMap, HeaderName, HeaderValue, OrigHeaderMap};
 
 type IndexMapSSR = IndexMap<String, String, RandomState>;
 
@@ -10,6 +10,7 @@ pub trait HeadersTraits {
     #[allow(dead_code)]
     fn to_indexmap(&self) -> IndexMapSSR;
     fn to_headermap(&self) -> HeaderMap;
+    fn to_orig_headermap(&self) -> OrigHeaderMap;
     #[allow(dead_code)]
     fn insert_key_value(&mut self, key: String, value: String) -> Result<(), Error>;
 }
@@ -29,6 +30,14 @@ impl HeadersTraits for IndexMapSSR {
             );
         }
         header_map
+    }
+
+    fn to_orig_headermap(&self) -> OrigHeaderMap {
+        let mut orig_map = OrigHeaderMap::with_capacity(self.len());
+        for (k, _v) in self {
+            orig_map.insert(k.clone());
+        }
+        orig_map
     }
 
     fn insert_key_value(&mut self, key: String, value: String) -> Result<(), Error> {
@@ -55,6 +64,14 @@ impl HeadersTraits for HeaderMap {
 
     fn to_headermap(&self) -> HeaderMap {
         self.clone()
+    }
+
+    fn to_orig_headermap(&self) -> OrigHeaderMap {
+        let mut orig_map = OrigHeaderMap::with_capacity(self.len());
+        for (key, _value) in self {
+            orig_map.insert(key.as_str().to_string());
+        }
+        orig_map
     }
 
     fn insert_key_value(&mut self, key: String, value: String) -> Result<(), Error> {

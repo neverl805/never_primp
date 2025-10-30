@@ -35,7 +35,9 @@ class Client(RClient):
             auth_bearer: str | None = None,
             params: dict[str, str] | None = None,
             headers: dict[str, str] | None = None,
+            ordered_headers: dict[str, str] | None = None,
             cookie_store: bool | None = True,
+            split_cookies: bool | None = False,
             referer: bool | None = True,
             proxy: str | None = None,
             timeout: float | None = 30,
@@ -62,8 +64,16 @@ class Client(RClient):
             auth_bearer: a string representing the bearer token for bearer token authentication. Default is None.
             params: a map of query parameters to append to the URL. Default is None.
             headers: an optional map of HTTP headers to send with requests. Ignored if `impersonate` is set.
+            ordered_headers: an optional ordered map of HTTP headers with strict order preservation.
+                Takes priority over `headers`. Use this for bypassing anti-bot detection that checks header order.
+                Example: {"User-Agent": "...", "Accept": "...", "Accept-Language": "..."}
+                Note: Python 3.7+ dict maintains insertion order by default.
             cookie_store: enable a persistent cookie store. Received cookies will be preserved and included
                  in additional requests. Default is True.
+            split_cookies: split cookies into multiple `cookie` headers (HTTP/2 style) instead of a single
+                `Cookie` header. Useful for mimicking browser behavior in HTTP/2. Default is False.
+                When True: cookie: a=1 \n cookie: b=2 \n cookie: c=3
+                When False: Cookie: a=1; b=2; c=3
             referer: automatic setting of the `Referer` header. Default is True.
             proxy: proxy URL for HTTP requests, example: "socks5://127.0.0.1:9150". Default is None.
             timeout: timeout for HTTP requests in seconds. Default is 30.

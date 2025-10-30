@@ -4,7 +4,7 @@ build-backend = "maturin"
 
 [project]
 name = "never_primp"
-version = "1.0.0"
+version = "1.1.0"
 description = "基于原primp 重新优化调整的请求库 - The fastest python HTTP client that can impersonate web browsers"
 readme = "README.md"
 requires-python = ">=3.8"
