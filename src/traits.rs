@@ -10,6 +10,7 @@ pub trait HeadersTraits {
     #[allow(dead_code)]
     fn to_indexmap(&self) -> IndexMapSSR;
     fn to_headermap(&self) -> HeaderMap;
+    #[allow(dead_code)]
     fn to_orig_headermap(&self) -> OrigHeaderMap;
     #[allow(dead_code)]
     fn insert_key_value(&mut self, key: String, value: String) -> Result<(), Error>;

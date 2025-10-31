@@ -199,18 +199,36 @@ resp1 = client.get("https://example.com/login")
 resp2 = client.get("https://example.com/dashboard")  # 自动包含 Cookie
 ```
 
+#### 类字典 Cookie 接口 (requests 风格)
+```python
+# 访问 cookie jar
+cookies = client.cookies
+
+# 设置 Cookie (类字典方式)
+cookies["session_id"] = "abc123"
+cookies.update({"user_token": "xyz789"})
+
+# 获取 Cookie
+session_id = cookies.get("session_id")
+all_cookies = dict(cookies)  # 获取所有 Cookie 为字典
+
+# 删除 Cookie
+del cookies["session_id"]
+cookies.clear()  # 清空所有
+```
+
 #### 手动 Cookie 控制
 ```python
-# 设置 Cookie
+# 为特定 URL 设置 Cookie
 client.set_cookies(
     url="https://example.com",
     cookies={"session": "abc123", "user_id": "456"}
 )
 
-# 获取 Cookie
+# 获取特定 URL 的所有 Cookie
 cookies = client.get_cookies(url="https://example.com")
 
-# 单次请求 Cookie
+# 单次请求 Cookie (临时，不存储)
 resp = client.get(url, cookies={"temp": "value"})
 ```
 
@@ -237,21 +255,30 @@ export PRIMP_CA_BUNDLE="/path/to/cert.pem"
 
 </details>
 
-### 🔄 重试机制
+### 🔄 HTTP 版本控制
 
 <details>
-<summary><b>点击展开</b></summary>
+<parameter name="summary"><b>点击展开</b></summary>
 
-指数退避的自动重试：
+控制使用哪个 HTTP 协议版本：
 
 ```python
-client = primp.Client(
-    retry_count=3,        # 最多重试 3 次
-    retry_backoff=1.0,    # 重试间隔 1 秒
-)
+# 强制使用 HTTP/1.1
+client = primp.Client(http1_only=True)
+
+# 强制使用 HTTP/2
+client = primp.Client(http2_only=True)
+
+# 自动协商（默认）
+client = primp.Client()  # 选择最佳可用版本
+
+# 优先级: http1_only > http2_only > 自动
 ```
 
-优雅地处理瞬态故障。
+**使用场景**:
+- `http1_only=True`: 旧版服务器、调试、特定兼容性需求
+- `http2_only=True`: 现代 API、性能优化
+- 默认: 最佳兼容性
 
 </details>
 
@@ -346,9 +373,8 @@ client = primp.Client(
     pool_max_idle_per_host=10,
     tcp_nodelay=True,
 
-    # 可靠性
-    retry_count=3,
-    retry_backoff=1.0,
+    # HTTP 版本控制
+    http2_only=True,  # 强制 HTTP/2 以获得更好性能
     timeout=30,
 )
 
@@ -393,7 +419,8 @@ Client(
     ca_cert_file: str | None = None,
 
     # HTTP 配置
-    http2_only: bool = False,
+    http1_only: bool = False,  # 🆕 强制 HTTP/1.1
+    http2_only: bool = False,  # 强制 HTTP/2
     https_only: bool = False,
     follow_redirects: bool = True,
     max_redirects: int = 20,
@@ -404,10 +431,6 @@ Client(
     pool_max_idle_per_host: int | None = None,
     tcp_nodelay: bool | None = None,
     tcp_keepalive: float | None = None,
-
-    # 重试机制
-    retry_count: int | None = None,
-    retry_backoff: float | None = None,
 
     # 查询参数
     params: dict[str, str] | None = None,
@@ -514,7 +537,6 @@ client = primp.Client(
         "accept-encoding": "gzip, deflate, br",
     },
     split_cookies=True,
-    retry_count=3,
 )
 
 response = client.get("https://difficult-site.com")

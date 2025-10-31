@@ -8,15 +8,53 @@
 cookie: session_id=abc123
 cookie: user_token=xyz789
 cookie: preference=dark
+priority: u=1, i
 ```
 
 而不是合并成一个：
 
 ```http
 Cookie: session_id=abc123; user_token=xyz789; preference=dark
+priority: u=1, i
 ```
 
 部分反爬虫系统会检测这个细节。
+
+## 重要：Cookie 与 Priority 的顺序
+
+无论使用何种模式，**priority 头部始终在最后一位，cookie 头部在 priority 之前**。
+
+### 顺序规则
+
+```
+...其他头部...
+cookie: xxx (单个或多个，取决于 split_cookies)
+priority: xxx (如果存在，始终最后)
+```
+
+**示例对比**：
+
+```python
+# split_cookies=False (默认)
+# Host: example.com
+# Content-Type: application/json
+# User-Agent: Mozilla/5.0...
+# ...其他头部...
+# cookie: session=abc; token=xyz; lang=en
+# priority: u=1, i
+
+# split_cookies=True
+# Host: example.com
+# Content-Type: application/json
+# User-Agent: Mozilla/5.0...
+# ...其他头部...
+# cookie: session=abc
+# cookie: token=xyz
+# cookie: lang=en
+# priority: u=1, i
+```
+
+📖 更多顺序规则请参考 [ORDERED_HEADERS.md](ORDERED_HEADERS.md)
 
 ## 快速使用
 
@@ -94,10 +132,11 @@ client = Client(
         "sec-fetch-mode": "cors",
         "sec-fetch-dest": "empty",
         "referer": "https://www.example.com/",
+        "priority": "u=1, i",  # 自动移到最后
     },
 )
 
-# Cookie 会被分割发送
+# Cookie 会被分割发送，且在 priority 之前
 response = client.post(
     "https://api.example.com/data",
     cookies={
@@ -108,8 +147,11 @@ response = client.post(
 )
 ```
 
-发送的请求头：
+发送的请求头（实际顺序）：
 ```http
+Host: api.example.com
+Content-Length: 123
+Content-Type: application/json
 user-agent: Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36
 sec-ch-ua: "Chromium";v="141", "Not?A_Brand";v="8"
 accept: */*
@@ -120,7 +162,13 @@ referer: https://www.example.com/
 cookie: buvid3=7A413405-3B2F-7DA8-4773-FACA58DC3B5A23886infoc
 cookie: b_nut=1761796023
 cookie: b_lsid=83F10657A_19A3339E8C7
+priority: u=1, i
 ```
+
+注意：
+- Host 和 Content-Length 自动添加在最前面
+- priority 自动移到最后一位
+- cookie 在 priority 之前
 
 ### 标准 API 调用
 
@@ -204,6 +252,28 @@ A: 使用抓包工具（Reqable/Charles）查看 **Raw Request**，确认 Cookie
 **Q: 与 impersonate 配合？**
 
 A: `impersonate` 会覆盖 `split_cookies` 设置。如需自定义，不要使用 `impersonate`。
+
+**Q: priority 头部的顺序？**
+
+A: **priority 始终在最后一位**，无论 split_cookies 设置如何。Cookie（单个或多个）都在 priority 之前。
+
+**Q: 如何同时使用 ordered_headers、split_cookies 和 priority？**
+
+A: 只需在 `ordered_headers` 中包含 priority，它会自动移到最后。Cookie 通过 `cookies` 参数传递，会自动排列在 priority 之前。
+
+```python
+client = Client(
+    split_cookies=True,
+    ordered_headers={
+        "user-agent": "...",
+        "accept": "...",
+        "priority": "u=1, i",  # 会自动移到最后
+    }
+)
+
+response = client.post(url, cookies={"a": "1", "b": "2"})
+# 顺序: ...其他头部... → cookie: a=1 → cookie: b=2 → priority: u=1, i
+```
 
 ## 调试验证
 

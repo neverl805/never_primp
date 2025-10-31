@@ -9,12 +9,14 @@ use indexmap::IndexMap;
 use pyo3::prelude::*;
 use pythonize::depythonize;
 use wreq::{
+    header::OrigHeaderMap,
     multipart,
     redirect::Policy,
     Body, Method,
 };
 use wreq_util::{Emulation, EmulationOS, EmulationOption};
 use serde_json::Value;
+use serde_urlencoded;
 use tokio::{
     fs::File,
     runtime::{self, Runtime},
@@ -77,17 +79,13 @@ pub struct RClient {
     verify: Option<bool>,
     ca_cert_file: Option<String>,
     https_only: Option<bool>,
+    http1_only: Option<bool>,
     http2_only: Option<bool>,
     // Performance optimization fields
     pool_idle_timeout: Option<f64>,
     pool_max_idle_per_host: Option<usize>,
     tcp_nodelay: Option<bool>,
     tcp_keepalive: Option<f64>,
-    // Retry mechanism
-    #[pyo3(get, set)]
-    retry_count: Option<usize>,
-    #[pyo3(get, set)]
-    retry_backoff: Option<f64>,
 }
 
 #[pymethods]
@@ -119,7 +117,9 @@ impl RClient {
     /// * `verify` - An optional boolean indicating whether to verify SSL certificates. Default is `true`.
     /// * `ca_cert_file` - Path to CA certificate store. Default is None.
     /// * `https_only` - Restrict the Client to be used with HTTPS only requests. Default is `false`.
-    /// * `http2_only` - If true - use only HTTP/2, if false - use only HTTP/1. Default is `false`.
+    /// * `http1_only` - If true - use only HTTP/1.1. Default is `false`.
+    /// * `http2_only` - If true - use only HTTP/2. Default is `false`.
+    ///   Note: `http1_only` and `http2_only` are mutually exclusive. If both are true, `http1_only` takes precedence.
     ///
     /// # Example
     ///
@@ -145,17 +145,17 @@ impl RClient {
     /// )
     /// ```
     #[new]
-    #[pyo3(signature = (auth=None, auth_bearer=None, params=None, headers=None, ordered_headers=None, cookie_store=true,
+    #[pyo3(signature = (auth=None, auth_bearer=None, params=None, headers=None, ordered_headers=None, cookies=None, cookie_store=true,
         split_cookies=false, referer=true, proxy=None, timeout=None, impersonate=None, impersonate_os=None, follow_redirects=true,
-        max_redirects=20, verify=true, ca_cert_file=None, https_only=false, http2_only=false,
-        pool_idle_timeout=None, pool_max_idle_per_host=None, tcp_nodelay=None, tcp_keepalive=None,
-        retry_count=None, retry_backoff=None))]
+        max_redirects=20, verify=true, ca_cert_file=None, https_only=false, http1_only=false, http2_only=false,
+        pool_idle_timeout=None, pool_max_idle_per_host=None, tcp_nodelay=None, tcp_keepalive=None))]
     fn new(
         auth: Option<(String, Option<String>)>,
         auth_bearer: Option<String>,
         params: Option<IndexMapSSR>,
         headers: Option<IndexMapSSR>,
         ordered_headers: Option<IndexMapSSR>,
+        cookies: Option<IndexMapSSR>,
         cookie_store: Option<bool>,
         split_cookies: Option<bool>,
         referer: Option<bool>,
@@ -168,15 +168,13 @@ impl RClient {
         verify: Option<bool>,
         ca_cert_file: Option<String>,
         https_only: Option<bool>,
+        http1_only: Option<bool>,
         http2_only: Option<bool>,
         // Performance optimization parameters
         pool_idle_timeout: Option<f64>,
         pool_max_idle_per_host: Option<usize>,
         tcp_nodelay: Option<bool>,
         tcp_keepalive: Option<f64>,
-        // Retry mechanism
-        retry_count: Option<usize>,
-        retry_backoff: Option<f64>,
     ) -> Result<Self> {
         // Client builder
         let mut client_builder = wreq::Client::builder();
@@ -197,13 +195,10 @@ impl RClient {
         }
 
         // Headers - prioritize ordered_headers over regular headers
-        if let Some(ref ordered_hdrs) = ordered_headers {
-            // Use ordered headers with OrigHeaderMap for strict order preservation
-            let headers_headermap = ordered_hdrs.to_headermap();
-            let orig_headermap = ordered_hdrs.to_orig_headermap();
-            client_builder = client_builder
-                .default_headers(headers_headermap)
-                .orig_headers(orig_headermap);
+        if let Some(ref _ordered_hdrs) = ordered_headers {
+            // Don't set ordered_headers as default_headers to avoid duplication
+            // They will be applied dynamically at request time with proper ordering
+            // (including Host, Content-Length repositioning)
         } else if let Some(ref hdrs) = headers {
             // Fallback to regular headers
             let headers_headermap = hdrs.to_headermap();
@@ -262,8 +257,10 @@ impl RClient {
             client_builder = client_builder.https_only(true);
         }
 
-        // Http2_only
-        if let Some(true) = http2_only {
+        // Http1_only and Http2_only (mutually exclusive, http1_only takes precedence)
+        if let Some(true) = http1_only {
+            client_builder = client_builder.http1_only();
+        } else if let Some(true) = http2_only {
             client_builder = client_builder.http2_only();
         }
 
@@ -287,7 +284,7 @@ impl RClient {
 
         let client = Arc::new(Mutex::new(client_builder.build()?));
 
-        Ok(RClient {
+        let rclient = RClient {
             client,
             cookie_jar,
             deleted_cookies: Arc::new(Mutex::new(HashSet::new())),
@@ -309,16 +306,21 @@ impl RClient {
             verify,
             ca_cert_file,
             https_only,
+            http1_only,
             http2_only,
             // Performance optimization fields
             pool_idle_timeout,
             pool_max_idle_per_host,
             tcp_nodelay,
             tcp_keepalive,
-            // Retry mechanism
-            retry_count,
-            retry_backoff,
-        })
+        };
+
+        // Set initial cookies if provided
+        if let Some(init_cookies) = cookies {
+            rclient.update_cookies(init_cookies, None, None)?;
+        }
+
+        Ok(rclient)
     }
 
     #[getter]
@@ -565,7 +567,11 @@ impl RClient {
     /// * `content` - The content to send in the request body as bytes. Default is None.
     /// * `data` - The form data to send in the request body. Default is None.
     /// * `json` -  A JSON serializable object to send in the request body. Default is None.
-    /// * `files` - A map of file fields to file paths to be sent as multipart/form-data. Default is None.
+    /// * `files` - Files to upload as multipart/form-data. Supports:
+    ///   - dict[str, str]: field name to file path
+    ///   - dict[str, bytes]: field name to file content
+    ///   - dict[str, tuple]: field name to (filename, content, mime_type)
+    ///   Can be combined with `data` for mixed form fields and files.
     /// * `auth` - A tuple containing the username and an optional password for basic authentication. Default is None.
     /// * `auth_bearer` - A string representing the bearer token for bearer token authentication. Default is None.
     /// * `timeout` - The timeout for the request in seconds. Default is 30.
@@ -591,7 +597,7 @@ impl RClient {
         content: Option<Vec<u8>>,
         data: Option<&Bound<'_, PyAny>>,
         json: Option<&Bound<'_, PyAny>>,
-        files: Option<IndexMap<String, String>>,
+        files: Option<&Bound<'_, PyAny>>,
         auth: Option<(String, Option<String>)>,
         auth_bearer: Option<String>,
         timeout: Option<f64>,
@@ -606,6 +612,60 @@ impl RClient {
         let auth_bearer = auth_bearer.or(self.auth_bearer.clone());
         let timeout: Option<f64> = timeout.or(self.timeout);
 
+        // Process files before async block (must be done in Python context)
+        enum FileData {
+            Path(String, String), // (field_name, file_path)
+            Bytes(String, String, Vec<u8>), // (field_name, filename, bytes)
+            BytesWithMime(String, String, Vec<u8>, String), // (field_name, filename, bytes, mime)
+        }
+
+        let mut files_data: Vec<FileData> = Vec::new();
+        if let Some(files_obj) = files {
+            if let Ok(files_dict) = files_obj.downcast::<pyo3::types::PyDict>() {
+                for (key, value) in files_dict.iter() {
+                    let field_name: String = key.extract()?;
+
+                    // Case 1: String (file path)
+                    if let Ok(file_path) = value.extract::<String>() {
+                        files_data.push(FileData::Path(field_name, file_path));
+                    }
+                    // Case 2: Bytes (raw data)
+                    else if let Ok(bytes) = value.extract::<Vec<u8>>() {
+                        files_data.push(FileData::Bytes(field_name.clone(), field_name, bytes));
+                    }
+                    // Case 3: Tuple (filename, data, [mime_type])
+                    else if let Ok(tuple) = value.downcast::<pyo3::types::PyTuple>() {
+                        let len = tuple.len();
+                        if len >= 2 {
+                            let filename: String = tuple.get_item(0)?.extract()?;
+
+                            // Data can be bytes or string (path)
+                            if let Ok(bytes) = tuple.get_item(1)?.extract::<Vec<u8>>() {
+                                if len >= 3 {
+                                    if let Ok(mime_str) = tuple.get_item(2)?.extract::<String>() {
+                                        files_data.push(FileData::BytesWithMime(
+                                            field_name.clone(),
+                                            filename,
+                                            bytes,
+                                            mime_str,
+                                        ));
+                                    } else {
+                                        files_data.push(FileData::Bytes(field_name.clone(), filename, bytes));
+                                    }
+                                } else {
+                                    files_data.push(FileData::Bytes(field_name.clone(), filename, bytes));
+                                }
+                            } else if let Ok(path) = tuple.get_item(1)?.extract::<String>() {
+                                files_data.push(FileData::Path(field_name, path));
+                            }
+                        }
+                    }
+                }
+            }
+        }
+
+        let has_files = !files_data.is_empty();
+
         let future = async {
             // Create request builder
             let mut request_builder = client.lock().unwrap().request(method, url);
@@ -615,66 +675,293 @@ impl RClient {
                 request_builder = request_builder.query(&params);
             }
 
-            // Headers - prioritize ordered_headers over regular headers
-            if let Some(ordered_hdrs) = ordered_headers {
-                // Use ordered headers with OrigHeaderMap for strict order preservation
-                let headers_headermap = ordered_hdrs.to_headermap();
-                let orig_headermap = ordered_hdrs.to_orig_headermap();
+            // Calculate body content and length for POST/PUT/PATCH (before setting headers)
+            let (body_bytes, content_type_header): (Option<Vec<u8>>, Option<String>) = if is_post_put_patch {
+                if has_files {
+                    // Multipart will be handled later, can't pre-calculate
+                    (None, None)
+                } else if let Some(content) = &content {
+                    // Raw bytes content
+                    (Some(content.clone()), None)
+                } else if let Some(form_data) = &data_value {
+                    // Data - smart handling
+                    if let Some(json_str) = form_data.as_str() {
+                        // JSON string
+                        if let Ok(parsed_json) = serde_json::from_str::<Value>(json_str) {
+                            let serialized = serde_json::to_vec(&parsed_json)?;
+                            (Some(serialized), Some("application/json".to_string()))
+                        } else {
+                            (Some(json_str.as_bytes().to_vec()), None)
+                        }
+                    } else {
+                        // Check if nested
+                        let is_nested = if let Some(obj) = form_data.as_object() {
+                            obj.values().any(|v| v.is_object() || v.is_array())
+                        } else {
+                            false
+                        };
+
+                        if is_nested {
+                            // Nested - use JSON
+                            let serialized = serde_json::to_vec(&form_data)?;
+                            (Some(serialized), Some("application/json".to_string()))
+                        } else {
+                            // Flat - use form-urlencoded
+                            let encoded = serde_urlencoded::to_string(&form_data)?;
+                            (Some(encoded.as_bytes().to_vec()), Some("application/x-www-form-urlencoded".to_string()))
+                        }
+                    }
+                } else if let Some(json_data) = &json_value {
+                    // JSON
+                    let serialized = serde_json::to_vec(&json_data)?;
+                    (Some(serialized), Some("application/json".to_string()))
+                } else {
+                    (None, None)
+                }
+            } else {
+                (None, None)
+            };
+
+            // Cookies - get effective cookies (from parameter or cookie_jar)
+            // Do this BEFORE processing headers so we can include cookies in header ordering
+            let effective_cookies = if let Some(cookies) = cookies {
+                Some(cookies)
+            } else {
+                // Get cookies from cookie_jar
+                let jar_cookies = self.get_all_cookies().ok();
+                jar_cookies.filter(|c| !c.is_empty())
+            };
+
+            // Headers - reorder to match browser behavior: Host first, then Content-Length, then others
+            // Check both request-level and client-level ordered_headers
+            let effective_ordered_headers = if ordered_headers.is_some() {
+                ordered_headers
+            } else {
+                // Use client-level ordered_headers if no request-level specified
+                self.ordered_headers.lock().ok().and_then(|guard| guard.clone())
+            };
+
+            if let Some(ordered_hdrs) = effective_ordered_headers {
+                // Create a new ordered map with strict ordering
+                let mut reordered_headers = IndexMap::with_capacity_and_hasher(ordered_hdrs.len() + 2, RandomState::default());
+
+                // 1. First, add Host header if present (case-insensitive check)
+                let host_value = ordered_hdrs.get("Host")
+                    .or_else(|| ordered_hdrs.get("host"))
+                    .or_else(|| ordered_hdrs.get("HOST"));
+
+                if let Some(host) = host_value {
+                    reordered_headers.insert("Host".to_string(), host.clone());
+                }
+
+                // 2. For POST/PUT/PATCH with body, add Content-Length in 2nd position
+                if let Some(ref body) = body_bytes {
+                    let content_length = body.len().to_string();
+                    reordered_headers.insert("Content-Length".to_string(), content_length);
+                } else if has_files {
+                    // For multipart, we can't pre-calculate, but reserve the position
+                    // This will be overwritten by wreq, but maintains position
+                    reordered_headers.insert("Content-Length".to_string(), "0".to_string());
+                }
+
+                // 3. Add Content-Type if we calculated it (and user didn't specify)
+                if let Some(ct) = content_type_header {
+                    let has_content_type = ordered_hdrs.iter().any(|(k, _)| k.to_lowercase() == "content-type");
+                    if !has_content_type {
+                        reordered_headers.insert("Content-Type".to_string(), ct);
+                    }
+                }
+
+                // 4. Add all other headers in their original order (skip Host, Content-Length, Content-Type, priority, cookie)
+                // priority and cookie will be added at the end
+                let mut priority_header: Option<(String, String)> = None;
+                let mut cookie_from_headers: Option<(String, String)> = None;
+
+                for (key, value) in ordered_hdrs.iter() {
+                    let key_lower = key.to_lowercase();
+                    // Skip if already added or if it's priority/cookie (will be added later)
+                    if key_lower == "host" || key_lower == "content-length" || reordered_headers.contains_key(key) {
+                        continue;
+                    }
+                    if key_lower == "priority" {
+                        priority_header = Some((key.clone(), value.clone()));
+                    } else if key_lower == "cookie" {
+                        cookie_from_headers = Some((key.clone(), value.clone()));
+                    } else {
+                        reordered_headers.insert(key.clone(), value.clone());
+                    }
+                }
+
+                // 5. Handle cookies based on split_cookies option
+                let should_add_cookies_separately = self.split_cookies.unwrap_or(false);
+
+                // Build orig_headermap manually to control exact order
+                let mut orig_headermap = OrigHeaderMap::with_capacity(reordered_headers.len() + 10);
+
+                // Add all current headers to orig_headermap
+                for (key, _) in reordered_headers.iter() {
+                    orig_headermap.insert(key.clone());
+                }
+
+                if should_add_cookies_separately {
+                    // Split cookies: add each cookie as a separate header in orig_headermap
+                    if let Some(cookies) = &effective_cookies {
+                        for (_k, _v) in cookies.iter() {
+                            // Add to orig_headermap for ordering
+                            orig_headermap.insert("cookie".to_string());
+                            // Add to request_builder after applying headers
+                        }
+                    } else if let Some((_, ref value)) = cookie_from_headers {
+                        // Split the cookie value and add each part
+                        for part in value.split(';') {
+                            let part = part.trim();
+                            if !part.is_empty() {
+                                orig_headermap.insert("cookie".to_string());
+                            }
+                        }
+                    }
+
+                    // Add priority to orig_headermap at the end
+                    if let Some((ref key, _)) = priority_header {
+                        orig_headermap.insert(key.clone());
+                    }
+                } else {
+                    // Merge cookies into single header
+                    if let Some(cookies) = &effective_cookies {
+                        if !cookies.is_empty() {
+                            let cookie_value = cookies
+                                .iter()
+                                .map(|(k, v)| format!("{}={}", k, v))
+                                .collect::<Vec<_>>()
+                                .join("; ");
+                            reordered_headers.insert("cookie".to_string(), cookie_value);
+                            orig_headermap.insert("cookie".to_string());
+                        }
+                    } else if let Some((ref key, ref value)) = cookie_from_headers {
+                        reordered_headers.insert(key.clone(), value.clone());
+                        orig_headermap.insert(key.clone());
+                    }
+
+                    // Add priority at the very end
+                    if let Some((ref key, ref value)) = priority_header {
+                        reordered_headers.insert(key.clone(), value.clone());
+                        orig_headermap.insert(key.clone());
+                    }
+                }
+
+                // Apply the reordered headers with strict order preservation
+                let headers_headermap = reordered_headers.to_headermap();
                 request_builder = request_builder
                     .headers(headers_headermap)
                     .orig_headers(orig_headermap);
+
+                // If split_cookies=true, add cookies separately using header_append
+                if should_add_cookies_separately {
+                    if let Some(cookies) = &effective_cookies {
+                        if !cookies.is_empty() {
+                            for (k, v) in cookies.iter() {
+                                let cookie_value = format!("{}={}", k, v);
+                                request_builder = request_builder.header_append("cookie", cookie_value);
+                            }
+                        }
+                    } else if let Some((_, ref value)) = cookie_from_headers {
+                        // If cookie came from ordered_headers, split it
+                        for part in value.split(';') {
+                            let part = part.trim();
+                            if !part.is_empty() {
+                                request_builder = request_builder.header_append("cookie", part);
+                            }
+                        }
+                    }
+
+                    // Add priority after cookies to maintain order
+                    // Use header_append to ensure it's added at the end
+                    if let Some((ref key, ref value)) = priority_header {
+                        request_builder = request_builder.header_append(key, value);
+                    }
+                }
             } else if let Some(headers) = headers {
                 // Fallback to regular headers
                 request_builder = request_builder.headers(headers.to_headermap());
-            }
 
-            // Cookies - handle based on split_cookies option
-            if let Some(cookies) = cookies {
-                if !cookies.is_empty() {
-                    if self.split_cookies.unwrap_or(false) {
-                        // Split: multiple cookie headers (HTTP/2 style)
-                        // Use lowercase "cookie" and header_append for multiple headers
-                        for (k, v) in cookies.iter() {
-                            let cookie_value = format!("{}={}", k, v);
-                            request_builder = request_builder.header_append("cookie", cookie_value);
+                // Add cookies separately if using regular headers
+                if let Some(cookies) = &effective_cookies {
+                    if !cookies.is_empty() {
+                        if self.split_cookies.unwrap_or(false) {
+                            // Split: multiple cookie headers (HTTP/2 style)
+                            for (k, v) in cookies.iter() {
+                                let cookie_value = format!("{}={}", k, v);
+                                request_builder = request_builder.header_append("cookie", cookie_value);
+                            }
+                        } else {
+                            // Merge: single Cookie header (HTTP/1.1 style, default)
+                            let cookie_value = cookies
+                                .iter()
+                                .map(|(k, v)| format!("{}={}", k, v))
+                                .collect::<Vec<_>>()
+                                .join("; ");
+                            request_builder = request_builder.header("Cookie", cookie_value);
                         }
-                    } else {
-                        // Merge: single Cookie header (HTTP/1.1 style, default)
-                        let cookie_value = cookies
-                            .iter()
-                            .map(|(k, v)| format!("{}={}", k, v))
-                            .collect::<Vec<_>>()
-                            .join("; ");
-                        request_builder = request_builder.header("Cookie", cookie_value);
                     }
                 }
             }
 
             // Only if method POST || PUT || PATCH
             if is_post_put_patch {
-                // Content
-                if let Some(content) = content {
-                    request_builder = request_builder.body(content);
-                }
-                // Data
-                if let Some(form_data) = data_value {
-                    request_builder = request_builder.form(&form_data);
-                }
-                // Json
-                if let Some(json_data) = json_value {
-                    request_builder = request_builder.json(&json_data);
-                }
-                // Files
-                if let Some(files) = files {
+                // Files - handle multipart/form-data
+                if has_files {
                     let mut form = multipart::Form::new();
-                    for (file_name, file_path) in files {
-                        let file = File::open(file_path).await?;
-                        let stream = FramedRead::new(file, BytesCodec::new());
-                        let file_body = Body::wrap_stream(stream);
-                        let part = multipart::Part::stream(file_body).file_name(file_name.clone());
-                        form = form.part(file_name, part);
+
+                    // Add data fields to multipart if present
+                    if let Some(form_data) = &data_value {
+                        if let Some(obj) = form_data.as_object() {
+                            for (key, value) in obj {
+                                let value_str = match value {
+                                    Value::String(s) => s.clone(),
+                                    _ => value.to_string(),
+                                };
+                                form = form.text(key.clone(), value_str);
+                            }
+                        }
                     }
+
+                    // Process files
+                    for file_data in files_data {
+                        match file_data {
+                            FileData::Path(field_name, file_path) => {
+                                let file = File::open(&file_path).await?;
+                                let stream = FramedRead::new(file, BytesCodec::new());
+                                let file_body = Body::wrap_stream(stream);
+
+                                // Extract filename from path
+                                let filename = std::path::Path::new(&file_path)
+                                    .file_name()
+                                    .and_then(|n| n.to_str())
+                                    .unwrap_or(&field_name)
+                                    .to_string();
+
+                                let part = multipart::Part::stream(file_body).file_name(filename);
+                                form = form.part(field_name, part);
+                            }
+                            FileData::Bytes(field_name, filename, bytes) => {
+                                let part = multipart::Part::bytes(bytes).file_name(filename);
+                                form = form.part(field_name, part);
+                            }
+                            FileData::BytesWithMime(field_name, filename, bytes, mime_str) => {
+                                let mut part = multipart::Part::bytes(bytes).file_name(filename);
+                                if let Ok(mime) = mime_str.parse::<mime::Mime>() {
+                                    part = part.mime_str(mime.as_ref())?;
+                                }
+                                form = form.part(field_name, part);
+                            }
+                        }
+                    }
+
                     request_builder = request_builder.multipart(form);
+                }
+                // Use pre-serialized body bytes
+                else if let Some(body) = body_bytes {
+                    request_builder = request_builder.body(body);
                 }
             }
 
@@ -742,13 +1029,9 @@ impl RClient {
 
         // Headers - prioritize ordered_headers over regular headers
         if let Ok(ordered_guard) = self.ordered_headers.lock() {
-            if let Some(ordered_hdrs) = ordered_guard.as_ref() {
-                // Use ordered headers with OrigHeaderMap for strict order preservation
-                let headers_headermap = ordered_hdrs.to_headermap();
-                let orig_headermap = ordered_hdrs.to_orig_headermap();
-                client_builder = client_builder
-                    .default_headers(headers_headermap)
-                    .orig_headers(orig_headermap);
+            if let Some(_ordered_hdrs) = ordered_guard.as_ref() {
+                // Don't set ordered_headers as default_headers to avoid duplication
+                // They will be applied dynamically at request time with proper ordering
             } else if let Ok(headers_guard) = self.headers.lock() {
                 if let Some(headers) = headers_guard.as_ref() {
                     // Fallback to regular headers
@@ -813,8 +1096,10 @@ impl RClient {
             client_builder = client_builder.https_only(true);
         }
 
-        // Http2_only
-        if let Some(true) = self.http2_only {
+        // Http1_only and Http2_only (mutually exclusive, http1_only takes precedence)
+        if let Some(true) = self.http1_only {
+            client_builder = client_builder.http1_only();
+        } else if let Some(true) = self.http2_only {
             client_builder = client_builder.http2_only();
         }
 

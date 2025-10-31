@@ -84,11 +84,12 @@ class RClient:
         params: dict[str, str] | None = None,
         headers: dict[str, str] | None = None,
         ordered_headers: dict[str, str] | None = None,
-        timeout: float | None = None,
+        cookies: dict[str, str] | None = None,
         cookie_store: bool | None = True,
         split_cookies: bool | None = False,
         referer: bool | None = True,
         proxy: str | None = None,
+        timeout: float | None = None,
         impersonate: IMPERSONATE | None = None,
         impersonate_os: IMPERSONATE_OS | None = None,
         follow_redirects: bool | None = True,
@@ -96,13 +97,12 @@ class RClient:
         verify: bool | None = True,
         ca_cert_file: str | None = None,
         https_only: bool | None = False,
+        http1_only: bool | None = False,
         http2_only: bool | None = False,
         pool_idle_timeout: float | None = None,
         pool_max_idle_per_host: int | None = None,
         tcp_nodelay: bool | None = None,
         tcp_keepalive: float | None = None,
-        retry_count: int | None = None,
-        retry_backoff: float | None = None,
     ): ...
     @property
     def headers(self) -> dict[str, str]: ...
@@ -142,14 +142,6 @@ class RClient:
     def split_cookies(self) -> bool | None: ...
     @split_cookies.setter
     def split_cookies(self, split_cookies: bool | None) -> None: ...
-    @property
-    def retry_count(self) -> int | None: ...
-    @retry_count.setter
-    def retry_count(self, retry_count: int | None) -> None: ...
-    @property
-    def retry_backoff(self) -> float | None: ...
-    @retry_backoff.setter
-    def retry_backoff(self, retry_backoff: float | None) -> None: ...
     @property
     def proxy(self) -> str | None: ...
     @proxy.setter

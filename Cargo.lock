@@ -725,7 +725,7 @@ dependencies = [
 
 [[package]]
 name = "never_primp"
-version = "1.0.2"
+version = "1.1.0"
 dependencies = [
  "anyhow",
  "encoding_rs",
@@ -741,6 +741,7 @@ dependencies = [
  "rand 0.9.0",
  "rustls-native-certs",
  "serde_json",
+ "serde_urlencoded",
  "tokio",
  "tokio-util",
  "tracing",

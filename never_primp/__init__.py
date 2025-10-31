@@ -143,6 +143,7 @@ class Client(RClient):
             params: dict[str, str] | None = None,
             headers: dict[str, str] | None = None,
             ordered_headers: dict[str, str] | None = None,
+            cookies: dict[str, str] | None = None,
             cookie_store: bool | None = True,
             split_cookies: bool | None = False,
             referer: bool | None = True,
@@ -155,15 +156,12 @@ class Client(RClient):
             verify: bool | None = True,
             ca_cert_file: str | None = None,
             https_only: bool | None = False,
+            http1_only: bool | None = False,
             http2_only: bool | None = False,
-            # Performance optimization parameters
             pool_idle_timeout: float | None = None,
             pool_max_idle_per_host: int | None = None,
             tcp_nodelay: bool | None = None,
             tcp_keepalive: float | None = None,
-            # Retry mechanism
-            retry_count: int | None = None,
-            retry_backoff: float | None = None,
     ):
         """
         Args:
@@ -175,6 +173,8 @@ class Client(RClient):
                 Takes priority over `headers`. Use this for bypassing anti-bot detection that checks header order.
                 Example: {"User-Agent": "...", "Accept": "...", "Accept-Language": "..."}
                 Note: Python 3.7+ dict maintains insertion order by default.
+            cookies: initial cookies to set for the client. These cookies will be included in all requests.
+                Can be updated later using client.cookies.update(). Default is None.
             cookie_store: enable a persistent cookie store. Received cookies will be preserved and included
                  in additional requests. Default is True.
             split_cookies: split cookies into multiple `cookie` headers (HTTP/2 style) instead of a single
@@ -207,10 +207,16 @@ class Client(RClient):
             verify: an optional boolean indicating whether to verify SSL certificates. Default is True.
             ca_cert_file: path to CA certificate store. Default is None.
             https_only: restrict the Client to be used with HTTPS only requests. Default is False.
-            http2_only: if true - use only HTTP/2, if false - use only HTTP/1. Default is False.
+            http1_only: if true - use only HTTP/1.1. Default is False.
+            http2_only: if true - use only HTTP/2. Default is False.
+                Note: http1_only and http2_only are mutually exclusive. If both are true, http1_only takes precedence.
         """
         super().__init__()
         self._cookies_jar: CookieJar | None = None
+
+        # Set initial cookies if provided
+        if cookies:
+            self.update_cookies(cookies)
 
     @property
     def cookies(self) -> CookieJar:
@@ -247,6 +253,79 @@ class Client(RClient):
         del self
 
     def request(self, method: HttpMethod, url: str, **kwargs: Unpack[RequestParams]) -> Response:
+        """
+        Send an HTTP request with support for requests-toolbelt MultipartEncoder.
+
+        Supports both native primp format and requests-toolbelt MultipartEncoder:
+        - Native: request(url, data={...}, files={...})
+        - Toolbelt: request(url, data=MultipartEncoder(...))
+        """
+        # Check if data is a MultipartEncoder from requests-toolbelt
+        data = kwargs.get('data')
+        if data is not None and hasattr(data, 'fields') and hasattr(data, 'content_type'):
+            # This looks like a MultipartEncoder
+            # Extract fields and convert to primp format
+            converted_data = {}
+            converted_files = {}
+
+            try:
+                # MultipartEncoder.fields is a dict-like object
+                for field_name, field_value in data.fields.items():
+                    if isinstance(field_value, tuple):
+                        # File field: (filename, file_obj, content_type)
+                        if len(field_value) >= 2:
+                            filename = field_value[0]
+                            file_obj = field_value[1]
+
+                            # Read the file content
+                            if hasattr(file_obj, 'read'):
+                                file_content = file_obj.read()
+                                # Reset file pointer if possible
+                                if hasattr(file_obj, 'seek'):
+                                    try:
+                                        file_obj.seek(0)
+                                    except:
+                                        pass
+                            else:
+                                file_content = file_obj
+
+                            # Add mime type if provided
+                            if len(field_value) >= 3:
+                                mime_type = field_value[2]
+                                converted_files[field_name] = (filename, file_content, mime_type)
+                            else:
+                                converted_files[field_name] = (filename, file_content)
+                    else:
+                        # Regular field
+                        if isinstance(field_value, bytes):
+                            converted_data[field_name] = field_value.decode('utf-8')
+                        else:
+                            converted_data[field_name] = str(field_value)
+
+                # Replace data and files in kwargs
+                if converted_data:
+                    kwargs['data'] = converted_data
+                else:
+                    kwargs.pop('data', None)
+
+                if converted_files:
+                    kwargs['files'] = converted_files
+
+            except Exception as e:
+                # If conversion fails, fall back to treating it as raw content
+                # Read the encoder as bytes and send as content
+                if hasattr(data, 'read'):
+                    kwargs['content'] = data.read()
+                    kwargs.pop('data', None)
+
+                    # Get content type from encoder
+                    if hasattr(data, 'content_type'):
+                        headers = kwargs.get('headers', {})
+                        if not isinstance(headers, dict):
+                            headers = dict(headers)
+                        headers['Content-Type'] = data.content_type
+                        kwargs['headers'] = headers
+
         return super().request(method=method, url=url, **kwargs)
 
     def get(self, url: str, **kwargs: Unpack[RequestParams]) -> Response:
@@ -278,6 +357,7 @@ class AsyncClient(Client):
                  params: dict[str, str] | None = None,
                  headers: dict[str, str] | None = None,
                  ordered_headers: dict[str, str] | None = None,
+                 cookies: dict[str, str] | None = None,
                  cookie_store: bool | None = True,
                  split_cookies: bool | None = False,
                  referer: bool | None = True,
@@ -290,17 +370,40 @@ class AsyncClient(Client):
                  verify: bool | None = True,
                  ca_cert_file: str | None = None,
                  https_only: bool | None = False,
+                 http1_only: bool | None = False,
                  http2_only: bool | None = False,
                  # Performance optimization parameters
                  pool_idle_timeout: float | None = None,
                  pool_max_idle_per_host: int | None = None,
                  tcp_nodelay: bool | None = None,
                  tcp_keepalive: float | None = None,
-                 # Retry mechanism
-                 retry_count: int | None = None,
-                 retry_backoff: float | None = None,
                  ):
-        super().__init__()
+        super().__init__(
+            auth=auth,
+            auth_bearer=auth_bearer,
+            params=params,
+            headers=headers,
+            ordered_headers=ordered_headers,
+            cookies=cookies,
+            cookie_store=cookie_store,
+            split_cookies=split_cookies,
+            referer=referer,
+            proxy=proxy,
+            timeout=timeout,
+            impersonate=impersonate,
+            impersonate_os=impersonate_os,
+            follow_redirects=follow_redirects,
+            max_redirects=max_redirects,
+            verify=verify,
+            ca_cert_file=ca_cert_file,
+            https_only=https_only,
+            http1_only=http1_only,
+            http2_only=http2_only,
+            pool_idle_timeout=pool_idle_timeout,
+            pool_max_idle_per_host=pool_max_idle_per_host,
+            tcp_nodelay=tcp_nodelay,
+            tcp_keepalive=tcp_keepalive,
+        )
 
     async def __aenter__(self) -> AsyncClient:
         return self

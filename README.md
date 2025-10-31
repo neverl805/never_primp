@@ -199,18 +199,36 @@ resp1 = client.get("https://example.com/login")
 resp2 = client.get("https://example.com/dashboard")  # Cookies included
 ```
 
+#### Dict-like Cookie Interface (requests-style)
+```python
+# Access cookie jar
+cookies = client.cookies
+
+# Set cookies (dict-like)
+cookies["session_id"] = "abc123"
+cookies.update({"user_token": "xyz789"})
+
+# Get cookies
+session_id = cookies.get("session_id")
+all_cookies = dict(cookies)  # Get all as dict
+
+# Delete cookies
+del cookies["session_id"]
+cookies.clear()  # Clear all
+```
+
 #### Manual Cookie Control
 ```python
-# Set cookies
+# Set cookies for specific URL
 client.set_cookies(
     url="https://example.com",
     cookies={"session": "abc123", "user_id": "456"}
 )
 
-# Get cookies
+# Get all cookies for specific URL
 cookies = client.get_cookies(url="https://example.com")
 
-# Per-request cookies
+# Per-request cookies (temporary, not stored)
 resp = client.get(url, cookies={"temp": "value"})
 ```
 
@@ -237,21 +255,30 @@ export PRIMP_CA_BUNDLE="/path/to/cert.pem"
 
 </details>
 
-### 🔄 Retry Mechanism
+### 🔄 HTTP Version Control
 
 <details>
 <summary><b>Click to expand</b></summary>
 
-Automatic retries with exponential backoff:
+Control which HTTP protocol version to use:
 
 ```python
-client = primp.Client(
-    retry_count=3,        # Retry up to 3 times
-    retry_backoff=1.0,    # 1 second backoff between retries
-)
+# Force HTTP/1.1
+client = primp.Client(http1_only=True)
+
+# Force HTTP/2
+client = primp.Client(http2_only=True)
+
+# Auto-negotiate (default)
+client = primp.Client()  # Picks best available
+
+# Priority: http1_only > http2_only > auto
 ```
 
-Handles transient failures gracefully.
+**Use Cases**:
+- `http1_only=True`: Legacy servers, debugging, specific compatibility needs
+- `http2_only=True`: Modern APIs, performance optimization
+- Default: Best compatibility
 
 </details>
 
@@ -346,9 +373,8 @@ client = primp.Client(
     pool_max_idle_per_host=10,
     tcp_nodelay=True,
 
-    # Reliability
-    retry_count=3,
-    retry_backoff=1.0,
+    # HTTP version control
+    http2_only=True,  # Force HTTP/2 for better performance
     timeout=30,
 )
 
@@ -393,7 +419,8 @@ Client(
     ca_cert_file: str | None = None,
 
     # HTTP Configuration
-    http2_only: bool = False,
+    http1_only: bool = False,  # 🆕 Force HTTP/1.1
+    http2_only: bool = False,  # Force HTTP/2
     https_only: bool = False,
     follow_redirects: bool = True,
     max_redirects: int = 20,
@@ -404,10 +431,6 @@ Client(
     pool_max_idle_per_host: int | None = None,
     tcp_nodelay: bool | None = None,
     tcp_keepalive: float | None = None,
-
-    # Retry Mechanism
-    retry_count: int | None = None,
-    retry_backoff: float | None = None,
 
     # Query Parameters
     params: dict[str, str] | None = None,
@@ -514,7 +537,6 @@ client = primp.Client(
         "accept-encoding": "gzip, deflate, br",
     },
     split_cookies=True,
-    retry_count=3,
 )
 
 response = client.get("https://difficult-site.com")
