@@ -2,61 +2,61 @@
 
 # 🪞 NEVER_PRIMP
 
-**Since the original primp project author did not maintain updates for a long time, he refactored and maintained based on the primp project**
+**由于原primp项目作者长时间不维护更新,所以自己基于primp项目进行重构维护**
 
-**The Ultimate Python HTTP Client for Web Scraping & Browser Impersonation**
+**终极 Python HTTP 客户端 - 专为网络爬虫与浏览器伪装设计**
 
 ![Python >= 3.8](https://img.shields.io/badge/python->=3.8-blue.svg)
 [![PyPI version](https://badge.fury.io/py/never-primp.svg)](https://pypi.org/project/never-primp)
 [![License](https://img.shields.io/badge/license-MIT-green.svg)](LICENSE)
 [![Rust](https://img.shields.io/badge/rust-1.70+-orange.svg)](https://www.rust-lang.org)
 
-*Lightning-fast HTTP client built with Rust, designed for web scraping, anti-bot bypass, and perfect browser impersonation*
+*基于 Rust 构建的闪电般快速的 HTTP 客户端，专为网络爬虫、反爬虫绕过和完美浏览器伪装而设计*
 
-[English](README.md) | [简体中文](README_CN.md)
+[简体中文](README_CN.md) | [English](README.md)
 
-[Installation](#-installation) •
-[Key Features](#-key-features) •
-[Quick Start](#-quick-start) •
-[Documentation](#-documentation) •
-[Examples](#-examples)
+[安装](#-安装) •
+[核心特性](#-核心特性) •
+[快速开始](#-快速开始) •
+[文档](#-文档) •
+[示例](#-示例)
 
 </div>
 
 ---
 
-## 🎯 What is NEVER_PRIMP?
+## 🎯 什么是 NEVER_PRIMP？
 
-**NEVER_PRIMP** (**P**ython **R**equests **IMP**ersonate) is a cutting-edge HTTP client library that combines:
+**NEVER_PRIMP** (**P**ython **R**equests **IMP**ersonate) 是一个前沿的 HTTP 客户端库，它结合了：
 
-- ⚡ **Blazing Speed**: Built on Rust's `wreq` with zero-copy parsing
-- 🎭 **Perfect Browser Impersonation**: Mimic Chrome, Firefox, Safari, Edge down to TLS/JA3/JA4 fingerprints
-- 🛡️ **Anti-Bot Bypass**: Advanced features for bypassing WAF, Cloudflare, and bot detection
-- 🔧 **Production-Ready**: Connection pooling, retries, cookies, streaming, and more
+- ⚡ **极致速度**：基于 Rust 的 `wreq` 构建，零拷贝解析
+- 🎭 **完美浏览器伪装**：模拟 Chrome、Firefox、Safari、Edge 的 TLS/JA3/JA4 指纹
+- 🛡️ **反爬虫绕过**：先进的功能绕过 WAF、Cloudflare 和机器人检测
+- 🔧 **生产就绪**：连接池、重试、Cookie、流式传输等完整功能
 
-### Why Choose NEVER_PRIMP?
+### 为什么选择 NEVER_PRIMP？
 
-| Feature | NEVER_PRIMP | requests | httpx | curl-cffi |
-|---------|-------------|----------|-------|-----------|
-| **Speed** | ⚡⚡⚡ | ⚡ | ⚡⚡ | ⚡⚡ |
-| **Browser Impersonation** | ✅ Full | ❌ | ❌ | ✅ Limited |
-| **Header Order Control** | ✅ | ❌ | ❌ | ❌ |
-| **Cookie Splitting (HTTP/2)** | ✅ | ❌ | ❌ | ❌ |
-| **Connection Pooling** | ✅ | ✅ | ✅ | ❌ |
-| **Async Support** | ✅ | ❌ | ✅ | ❌ |
-| **Native TLS** | ✅ | ❌ | ❌ | ✅ |
+| 功能 | NEVER_PRIMP | requests | httpx | curl-cffi |
+|------|-------------|----------|-------|-----------|
+| **速度** | ⚡⚡⚡ | ⚡ | ⚡⚡ | ⚡⚡ |
+| **浏览器伪装** | ✅ 完整 | ❌ | ❌ | ✅ 有限 |
+| **请求头顺序控制** | ✅ | ❌ | ❌ | ❌ |
+| **Cookie 分割 (HTTP/2)** | ✅ | ❌ | ❌ | ❌ |
+| **连接池** | ✅ | ✅ | ✅ | ❌ |
+| **异步支持** | ✅ | ❌ | ✅ | ❌ |
+| **原生 TLS** | ✅ | ❌ | ❌ | ✅ |
 
 ---
 
-## 📦 Installation
+## 📦 安装
 
 ```bash
 pip install -U never-primp
 ```
 
-### Platform Support
+### 平台支持
 
-Precompiled wheels available for:
+提供预编译的二进制包：
 - 🐧 **Linux**: x86_64, aarch64, armv7 (manylinux_2_34+)
 - 🐧 **Linux (musl)**: x86_64, aarch64
 - 🪟 **Windows**: x86_64
@@ -64,71 +64,71 @@ Precompiled wheels available for:
 
 ---
 
-## ✨ Key Features
+## ✨ 核心特性
 
-### 🚀 Performance Optimized
+### 🚀 性能优化
 
 <details>
-<summary><b>Click to expand</b></summary>
+<summary><b>点击展开</b></summary>
 
-- **Connection Pooling**: Reuse connections with configurable idle timeout
-- **TCP Optimization**: TCP_NODELAY + TCP keepalive for lower latency
-- **Zero-Copy Parsing**: Rust's efficient memory handling
-- **HTTP/2 Multiplexing**: Multiple requests over single connection
+- **连接池**：可配置空闲超时的连接重用
+- **TCP 优化**：TCP_NODELAY + TCP keepalive 降低延迟
+- **零拷贝解析**：Rust 的高效内存处理
+- **HTTP/2 多路复用**：单个连接处理多个请求
 
 ```python
 client = primp.Client(
-    pool_idle_timeout=90.0,        # Keep connections alive 90s
-    pool_max_idle_per_host=10,     # Max 10 idle connections per host
-    tcp_nodelay=True,               # Disable Nagle's algorithm
-    tcp_keepalive=60.0,            # TCP keepalive every 60s
+    pool_idle_timeout=90.0,        # 保持连接 90 秒
+    pool_max_idle_per_host=10,     # 每个主机最多 10 个空闲连接
+    tcp_nodelay=True,               # 禁用 Nagle 算法
+    tcp_keepalive=60.0,            # TCP keepalive 每 60 秒
 )
 ```
 
-**Benchmark**: ~59% faster than `requests` for sequential requests with connection reuse.
+**基准测试**：连接复用的顺序请求比 `requests` 快约 59%。
 
 </details>
 
-### 🎭 Advanced Browser Impersonation
+### 🎭 高级浏览器伪装
 
 <details>
-<summary><b>Click to expand</b></summary>
+<summary><b>点击展开</b></summary>
 
-Perfect fingerprint mimicry for:
+完美的指纹模拟：
 
-- **Chrome** (100-141): Latest versions with full TLS/HTTP2 fingerprints
-- **Safari** (15.3-26): iOS, iPadOS, macOS variants
-- **Firefox** (109-143): Desktop versions
-- **Edge** (101-134): Chromium-based
-- **OkHttp** (3.9-5.0): Android application library
+- **Chrome** (100-141)：最新版本的完整 TLS/HTTP2 指纹
+- **Safari** (15.3-26)：iOS、iPadOS、macOS 变体
+- **Firefox** (109-143)：桌面版本
+- **Edge** (101-134)：基于 Chromium
+- **OkHttp** (3.9-5.0)：Android 应用库
 
 ```python
 client = primp.Client(
-    impersonate="chrome_141",      # Browser version
-    impersonate_os="windows"       # OS: windows, macos, linux, android, ios
+    impersonate="chrome_141",      # 浏览器版本
+    impersonate_os="windows"       # 操作系统: windows, macos, linux, android, ios
 )
 ```
 
-Impersonates:
-- ✅ TLS fingerprint (JA3/JA4)
-- ✅ HTTP/2 fingerprint (AKAMAI)
-- ✅ Header order and casing
-- ✅ Cipher suites
-- ✅ Extension order
+模拟内容：
+- ✅ TLS 指纹 (JA3/JA4)
+- ✅ HTTP/2 指纹 (AKAMAI)
+- ✅ 请求头顺序和大小写
+- ✅ 加密套件
+- ✅ 扩展顺序
 
 </details>
 
-### 🛡️ Anti-Bot Bypass Features
+### 🛡️ 反爬虫绕过功能
 
 <details>
-<summary><b>Click to expand</b></summary>
+<summary><b>点击展开</b></summary>
 
-#### 1. **Ordered Headers** 🆕
-Maintain exact header order to bypass detection systems that check header sequence:
+#### 1. **有序请求头** 🆕
+维持精确的请求头顺序以绕过检测请求头序列的检测系统：
 
 ```python
 client = primp.Client(
-    ordered_headers={
+    headers={
         "user-agent": "Mozilla/5.0...",
         "accept": "text/html,application/xhtml+xml",
         "accept-language": "en-US,en;q=0.9",
@@ -139,155 +139,153 @@ client = primp.Client(
 )
 ```
 
-**Use Case**: Websites checking header order (Cloudflare, Akamai, etc.)
+**使用场景**：检查请求头顺序的网站（Cloudflare、Akamai 等）
 
-📖 [Full Documentation](ORDERED_HEADERS.md)
-
-#### 2. **Split Cookies (HTTP/2)** 🆕
-Send cookies as separate headers like real browsers:
+#### 2. **Cookie 分割 (HTTP/2)** 🆕
+像真实浏览器一样将 Cookie 作为独立的请求头发送：
 
 ```python
 client = primp.Client(
-    split_cookies=True,  # Send cookies in HTTP/2 style
+    split_cookies=True,  # 使用 HTTP/2 风格发送 Cookie
     http2_only=True
 )
 
-# Sends:
+# 发送格式：
 # cookie: session_id=abc123
 # cookie: user_token=xyz789
 # cookie: preference=dark_mode
 
-# Instead of:
+# 而不是：
 # Cookie: session_id=abc123; user_token=xyz789; preference=dark_mode
 ```
 
-**Use Case**: Precise HTTP/2 browser simulation for anti-bot bypass
+**使用场景**：精确的 HTTP/2 浏览器模拟以绕过反爬虫
 
-📖 [Full Documentation](SPLIT_COOKIES.md)
+📖 [完整文档](SPLIT_COOKIES.md)
 
-#### 3. **Dynamic Configuration**
-Change client behavior without recreation:
+#### 3. **动态配置**
+无需重新创建即可更改客户端行为：
 
 ```python
 client = primp.Client(impersonate="chrome_140")
 
-# Switch impersonation dynamically
+# 动态切换伪装
 client.impersonate = "safari_18"
 client.impersonate_os = "macos"
 
-# Update headers
-client.ordered_headers = {...}
+# 更新请求头
+client.headers = {...}
 client.headers_update({"Referer": "https://example.com"})
 
-# Change proxy
+# 更改代理
 client.proxy = "socks5://127.0.0.1:1080"
 ```
 
 </details>
 
-### 🍪 Smart Cookie Management
+### 🍪 智能 Cookie 管理
 
 <details>
-<summary><b>Click to expand</b></summary>
+<summary><b>点击展开</b></summary>
 
-#### Automatic Cookie Persistence
+#### 自动 Cookie 持久化
 ```python
-client = primp.Client(cookie_store=True)  # Default
+client = primp.Client(cookie_store=True)  # 默认开启
 
-# Cookies automatically stored and sent
+# Cookie 自动存储和发送
 resp1 = client.get("https://example.com/login")
-resp2 = client.get("https://example.com/dashboard")  # Cookies included
+resp2 = client.get("https://example.com/dashboard")  # 自动包含 Cookie
 ```
 
-#### Dict-like Cookie Interface (requests-style)
+#### 类字典 Cookie 接口 (requests 风格)
 ```python
-# Access cookie jar
+# 访问 cookie jar
 cookies = client.cookies
 
-# Set cookies (dict-like)
+# 设置 Cookie (类字典方式)
 cookies["session_id"] = "abc123"
 cookies.update({"user_token": "xyz789"})
 
-# Get cookies
+# 获取 Cookie
 session_id = cookies.get("session_id")
-all_cookies = dict(cookies)  # Get all as dict
+all_cookies = dict(cookies)  # 获取所有 Cookie 为字典
 
-# Delete cookies
+# 删除 Cookie
 del cookies["session_id"]
-cookies.clear()  # Clear all
+cookies.clear()  # 清空所有
 ```
 
-#### Manual Cookie Control
+#### 手动 Cookie 控制
 ```python
-# Set cookies for specific URL
+# 为特定 URL 设置 Cookie
 client.set_cookies(
     url="https://example.com",
     cookies={"session": "abc123", "user_id": "456"}
 )
 
-# Get all cookies for specific URL
+# 获取特定 URL 的所有 Cookie
 cookies = client.get_cookies(url="https://example.com")
 
-# Per-request cookies (temporary, not stored)
+# 单次请求 Cookie (临时，不存储)
 resp = client.get(url, cookies={"temp": "value"})
 ```
 
 </details>
 
-### 🔒 Certificate Management
+### 🔒 证书管理
 
 <details>
-<summary><b>Click to expand</b></summary>
+<summary><b>点击展开</b></summary>
 
-- **System Certificate Store**: Auto-updated with OS (no more expiration issues!)
-- **Custom CA Bundle**: Support for corporate proxies
+- **系统证书库**：随操作系统自动更新（不再有证书过期问题！）
+- **自定义 CA 包**：支持企业代理
 
 ```python
-# Use system certificates (default)
+# 使用系统证书（默认）
 client = primp.Client(verify=True)
 
-# Custom CA bundle
+# 自定义 CA 包
 client = primp.Client(ca_cert_file="/path/to/cacert.pem")
 
-# Environment variable
+# 环境变量
 export PRIMP_CA_BUNDLE="/path/to/cert.pem"
 ```
 
 </details>
 
-### 🔄 HTTP Version Control
+### 🔄 HTTP 版本控制
 
 <details>
-<summary><b>Click to expand</b></summary>
+<parameter name="summary"><b>点击展开</b></summary>
 
-Control which HTTP protocol version to use:
+控制使用哪个 HTTP 协议版本：
 
 ```python
-# Force HTTP/1.1
+# 强制使用 HTTP/1.1
 client = primp.Client(http1_only=True)
 
-# Force HTTP/2
+# 强制使用 HTTP/2
 client = primp.Client(http2_only=True)
 
-# Auto-negotiate (default)
-client = primp.Client()  # Picks best available
+# 自动协商（默认）
+client = primp.Client()  # 选择最佳可用版本
 
-# Priority: http1_only > http2_only > auto
+# 优先级: http1_only > http2_only > 自动
 ```
 
-**Use Cases**:
-- `http1_only=True`: Legacy servers, debugging, specific compatibility needs
-- `http2_only=True`: Modern APIs, performance optimization
-- Default: Best compatibility
+**使用场景**:
+- `http1_only=True`: 旧版服务器、调试、特定兼容性需求
+- `http2_only=True`: 现代 API、性能优化
+- 默认: 最佳兼容性
 
 </details>
 
-### 🌊 Streaming Responses
+### 🌊 流式响应
 
 <details>
-<summary><b>Click to expand</b></summary>
+<summary><b>点击展开</b></summary>
 
-Stream large responses efficiently:
+高效地流式传输大型响应：
 
 ```python
 resp = client.get("https://example.com/large-file.zip")
@@ -298,12 +296,12 @@ for chunk in resp.stream():
 
 </details>
 
-### ⚡ Async Support
+### ⚡ 异步支持
 
 <details>
-<summary><b>Click to expand</b></summary>
+<summary><b>点击展开</b></summary>
 
-Full async/await support with `AsyncClient`:
+完整的 async/await 支持，使用 `AsyncClient`：
 
 ```python
 import asyncio
@@ -325,35 +323,35 @@ asyncio.run(main())
 
 ---
 
-## 🚀 Quick Start
+## 🚀 快速开始
 
-### Basic Usage
+### 基础用法
 
 ```python
 import never_primp as primp
 
-# Simple GET request
+# 简单的 GET 请求
 client = primp.Client()
 response = client.get("https://httpbin.org/get")
 print(response.text)
 
-# With browser impersonation
+# 带浏览器伪装
 client = primp.Client(impersonate="chrome_141", impersonate_os="windows")
 response = client.get("https://tls.peet.ws/api/all")
 print(response.json())
 ```
 
-### Perfect Browser Simulation
+### 完美的浏览器模拟
 
 ```python
-# Complete browser simulation for anti-bot bypass
+# 完整的浏览器模拟用于反爬虫绕过
 client = primp.Client(
-    # Browser impersonation
+    # 浏览器伪装
     impersonate="chrome_141",
     impersonate_os="windows",
 
-    # Advanced anti-detection
-    ordered_headers={
+    # 高级反检测
+    headers={
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "sec-ch-ua": '"Chromium";v="141", "Not?A_Brand";v="8"',
         "sec-ch-ua-mobile": "?0",
@@ -366,73 +364,71 @@ client = primp.Client(
         "accept-encoding": "gzip, deflate, br",
         "accept-language": "en-US,en;q=0.9",
     },
-    split_cookies=True,  # HTTP/2 style cookies
+    split_cookies=True,  # HTTP/2 风格的 Cookie
 
-    # Performance optimization
+    # 性能优化
     pool_idle_timeout=90.0,
     pool_max_idle_per_host=10,
     tcp_nodelay=True,
 
-    # HTTP version control
-    http2_only=True,  # Force HTTP/2 for better performance
+    # HTTP 版本控制
+    http2_only=True,  # 强制 HTTP/2 以获得更好性能
     timeout=30,
 )
 
-# Use like any HTTP client
+# 像任何 HTTP 客户端一样使用
 response = client.get("https://difficult-site.com")
 ```
 
 ---
 
-## 📚 Documentation
+## 📚 文档
 
-### Core Documentation
+### 核心文档
 
-- [**Ordered Headers Guide**](ORDERED_HEADERS.md) - Master header order control for anti-bot bypass
-- [**Split Cookies Guide**](SPLIT_COOKIES.md) - HTTP/2 cookie handling like real browsers
+- [**Cookie 分割指南**](SPLIT_COOKIES.md) - 像真实浏览器一样处理 HTTP/2 Cookie
 
-### Quick References
+### 快速参考
 
 <details>
-<summary><b>Client Parameters</b></summary>
+<summary><b>Client 参数</b></summary>
 
 ```python
 Client(
-    # Authentication
+    # 认证
     auth: tuple[str, str | None] | None = None,
     auth_bearer: str | None = None,
 
-    # Headers & Cookies
-    headers: dict[str, str] | None = None,
-    ordered_headers: dict[str, str] | None = None,  # 🆕 Ordered headers
+    # 请求头和 Cookie
+    headers: dict[str, str] | None = None,  # 🆕 有序请求头
     cookie_store: bool = True,
-    split_cookies: bool = False,  # 🆕 HTTP/2 cookie splitting
+    split_cookies: bool = False,  # 🆕 HTTP/2 Cookie 分割
 
-    # Browser Impersonation
-    impersonate: str | None = None,  # chrome_141, safari_18, etc.
-    impersonate_os: str | None = None,  # windows, macos, linux, etc.
+    # 浏览器伪装
+    impersonate: str | None = None,  # chrome_141, safari_18 等
+    impersonate_os: str | None = None,  # windows, macos, linux 等
 
-    # Network Settings
+    # 网络设置
     proxy: str | None = None,
     timeout: float = 30,
     verify: bool = True,
     ca_cert_file: str | None = None,
 
-    # HTTP Configuration
-    http1_only: bool = False,  # 🆕 Force HTTP/1.1
-    http2_only: bool = False,  # Force HTTP/2
+    # HTTP 配置
+    http1_only: bool = False,  # 🆕 强制 HTTP/1.1
+    http2_only: bool = False,  # 强制 HTTP/2
     https_only: bool = False,
     follow_redirects: bool = True,
     max_redirects: int = 20,
     referer: bool = True,
 
-    # Performance Optimization
+    # 性能优化
     pool_idle_timeout: float | None = None,
     pool_max_idle_per_host: int | None = None,
     tcp_nodelay: bool | None = None,
     tcp_keepalive: float | None = None,
 
-    # Query Parameters
+    # 查询参数
     params: dict[str, str] | None = None,
 )
 ```
@@ -440,10 +436,10 @@ Client(
 </details>
 
 <details>
-<summary><b>Request Methods</b></summary>
+<summary><b>请求方法</b></summary>
 
 ```python
-# HTTP Methods
+# HTTP 方法
 client.get(url, **kwargs)
 client.post(url, **kwargs)
 client.put(url, **kwargs)
@@ -452,16 +448,15 @@ client.delete(url, **kwargs)
 client.head(url, **kwargs)
 client.options(url, **kwargs)
 
-# Common Parameters
+# 通用参数
 params: dict[str, str] | None = None,
-headers: dict[str, str] | None = None,
-ordered_headers: dict[str, str] | None = None,  # 🆕
+headers: dict[str, str] | None = None,  # 🆕
 cookies: dict[str, str] | None = None,
 auth: tuple[str, str | None] | None = None,
 auth_bearer: str | None = None,
 timeout: float | None = None,
 
-# POST/PUT/PATCH Specific
+# POST/PUT/PATCH 特定参数
 content: bytes | None = None,
 data: dict[str, Any] | None = None,
 json: Any | None = None,
@@ -471,31 +466,31 @@ files: dict[str, str] | None = None,
 </details>
 
 <details>
-<summary><b>Response Object</b></summary>
+<summary><b>响应对象</b></summary>
 
 ```python
-response.status_code        # HTTP status code
-response.headers            # Response headers
-response.cookies            # Response cookies
-response.url                # Final URL (after redirects)
-response.encoding           # Content encoding
+response.status_code        # HTTP 状态码
+response.headers            # 响应头
+response.cookies            # 响应 Cookie
+response.url                # 最终 URL（重定向后）
+response.encoding           # 内容编码
 
-# Body Access
-response.text               # Text content
-response.content            # Binary content
-response.json()             # Parse JSON
-response.stream()           # Stream response body
+# 正文访问
+response.text               # 文本内容
+response.content            # 二进制内容
+response.json()             # 解析 JSON
+response.stream()           # 流式传输响应正文
 
-# HTML Conversion
+# HTML 转换
 response.text_markdown      # HTML → Markdown
-response.text_plain         # HTML → Plain text
-response.text_rich          # HTML → Rich text
+response.text_plain         # HTML → 纯文本
+response.text_rich          # HTML → 富文本
 ```
 
 </details>
 
 <details>
-<summary><b>Supported Browsers</b></summary>
+<summary><b>支持的浏览器</b></summary>
 
 #### Chrome (100-141)
 `chrome_100`, `chrome_101`, `chrome_104`, `chrome_105`, `chrome_106`, `chrome_107`, `chrome_108`, `chrome_109`, `chrome_114`, `chrome_116`, `chrome_117`, `chrome_118`, `chrome_119`, `chrome_120`, `chrome_123`, `chrome_124`, `chrome_126`, `chrome_127`, `chrome_128`, `chrome_129`, `chrome_130`, `chrome_131`, `chrome_133`, `chrome_134`, `chrome_135`, `chrome_136`, `chrome_137`, `chrome_138`, `chrome_139`, `chrome_140`, `chrome_141`
@@ -512,25 +507,25 @@ response.text_rich          # HTML → Rich text
 #### OkHttp (3.9-5.0)
 `okhttp_3.9`, `okhttp_3.11`, `okhttp_3.13`, `okhttp_3.14`, `okhttp_4.9`, `okhttp_4.10`, `okhttp_5`
 
-#### OS Support
+#### 操作系统支持
 `windows`, `macos`, `linux`, `android`, `ios`
 
 </details>
 
 ---
 
-## 💡 Examples
+## 💡 示例
 
-### Example 1: Web Scraping with Anti-Bot Bypass
+### 示例 1：网络爬虫与反爬虫绕过
 
 ```python
 import never_primp as primp
 
-# Perfect browser simulation
+# 完美的浏览器模拟
 client = primp.Client(
     impersonate="chrome_141",
     impersonate_os="windows",
-    ordered_headers={
+    headers={
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "accept-language": "en-US,en;q=0.9",
@@ -543,7 +538,7 @@ response = client.get("https://difficult-site.com")
 print(response.status_code)
 ```
 
-### Example 2: API Integration with Authentication
+### 示例 2：带认证的 API 集成
 
 ```python
 client = primp.Client(
@@ -555,17 +550,17 @@ client = primp.Client(
     timeout=30,
 )
 
-# GET request
+# GET 请求
 data = client.get("https://api.example.com/users").json()
 
-# POST request
+# POST 请求
 response = client.post(
     "https://api.example.com/users",
     json={"name": "John", "email": "john@example.com"}
 )
 ```
 
-### Example 3: File Upload
+### 示例 3：文件上传
 
 ```python
 client = primp.Client()
@@ -582,37 +577,37 @@ response = client.post(
 )
 ```
 
-### Example 4: Session Management
+### 示例 4：会话管理
 
 ```python
-# Automatic cookie persistence
+# 自动 Cookie 持久化
 client = primp.Client(cookie_store=True)
 
-# Login
+# 登录
 client.post(
     "https://example.com/login",
     data={"username": "user", "password": "pass"}
 )
 
-# Subsequent requests include session cookies
+# 后续请求自动包含会话 Cookie
 profile = client.get("https://example.com/profile")
 ```
 
-### Example 5: Proxy Usage
+### 示例 5：代理使用
 
 ```python
-# SOCKS5 proxy
+# SOCKS5 代理
 client = primp.Client(proxy="socks5://127.0.0.1:1080")
 
-# HTTP proxy with authentication
+# 带认证的 HTTP 代理
 client = primp.Client(proxy="http://user:pass@proxy.example.com:8080")
 
-# Environment variable
+# 环境变量
 import os
 os.environ['PRIMP_PROXY'] = 'http://127.0.0.1:8080'
 ```
 
-### Example 6: Async Concurrent Requests
+### 示例 6：异步并发请求
 
 ```python
 import asyncio
@@ -628,7 +623,7 @@ urls = ["https://site1.com", "https://site2.com", "https://site3.com"]
 results = asyncio.run(fetch_all(urls))
 ```
 
-### Example 7: Streaming Large Files
+### 示例 7：流式传输大文件
 
 ```python
 client = primp.Client()
@@ -642,156 +637,149 @@ with open("output.zip", "wb") as f:
 
 ---
 
-## 🎯 Use Cases
+## 🎯 使用场景
 
-### ✅ Perfect For
+### ✅ 完美适用于
 
-- **Web Scraping**: Bypass anti-bot systems (Cloudflare, Akamai, PerimeterX)
-- **API Testing**: High-performance API client with retries
-- **Data Collection**: Concurrent requests with connection pooling
-- **Security Research**: TLS fingerprint analysis and testing
-- **Browser Automation Alternative**: Lighter than Selenium/Playwright
+- **网络爬虫**：绕过反爬虫系统（Cloudflare、Akamai、PerimeterX）
+- **API 测试**：带重试的高性能 API 客户端
+- **数据采集**：带连接池的并发请求
+- **安全研究**：TLS 指纹分析和测试
+- **浏览器自动化替代**：比 Selenium/Playwright 更轻量
 
-### ⚠️ Not Suitable For
+### ⚠️ 不适用于
 
-- **JavaScript Rendering**: Use Playwright/Selenium for dynamic content
-- **Browser Automation**: No DOM manipulation or JavaScript execution
-- **Visual Testing**: No screenshot or rendering capabilities
+- **JavaScript 渲染**：使用 Playwright/Selenium 处理动态内容
+- **浏览器自动化**：无 DOM 操作或 JavaScript 执行
+- **视觉测试**：无截图或渲染功能
 
 ---
 
-## 🔬 Benchmarks
+## 🔬 基准测试
 
-### Sequential Requests (Connection Reuse)
+### 顺序请求（连接复用）
 
-| Library | Time (10 requests) | Relative Speed |
+| 库 | 时间（10 个请求） | 相对速度 |
 |---------|-------------------|----------------|
-| **never_primp** | 1.24s | **1.00x** (baseline) |
-| httpx | 1.89s | 0.66x slower |
-| requests | 3.05s | 0.41x slower |
+| **never_primp** | 1.24s | **1.00x**（基准） |
+| httpx | 1.89s | 0.66x 更慢 |
+| requests | 3.05s | 0.41x 更慢 |
 
-### Concurrent Requests (AsyncClient)
+### 并发请求（AsyncClient）
 
-| Library | Time (100 requests) | Relative Speed |
+| 库 | 时间（100 个请求） | 相对速度 |
 |---------|---------------------|----------------|
-| **never_primp** | 2.15s | **1.00x** (baseline) |
-| httpx | 2.83s | 0.76x slower |
-| aiohttp | 2.45s | 0.88x slower |
+| **never_primp** | 2.15s | **1.00x**（基准） |
+| httpx | 2.83s | 0.76x 更慢 |
+| aiohttp | 2.45s | 0.88x 更慢 |
 
-*Benchmarks run on: Python 3.11, Ubuntu 22.04, AMD Ryzen 9 5900X*
+*基准测试环境：Python 3.11, Ubuntu 22.04, AMD Ryzen 9 5900X*
 
 ---
 
-## 🛠️ Development
+## 🛠️ 开发
 
-### Building from Source
+### 从源码构建
 
 ```bash
-# Clone repository
+# 克隆仓库
 git clone https://github.com/yourusername/never-primp.git
 cd never-primp
 
-# Create virtual environment
+# 创建虚拟环境
 python -m venv venv
 source venv/bin/activate  # Linux/macOS
-# or
+# 或
 venv\Scripts\activate  # Windows
 
-# Install maturin (Rust-Python build tool)
+# 安装 maturin（Rust-Python 构建工具）
 pip install maturin
 
-# Build and install in development mode
+# 以开发模式构建和安装
 maturin develop --release
 
-# Run examples
-python examples/example_ordered_headers.py
+# 运行示例
+python examples/example_headers.py
 ```
 
-### Project Structure
+### 项目结构
 
 ```
 never-primp/
 ├── src/
-│   ├── lib.rs              # Main Rust implementation
-│   ├── traits.rs           # Header conversion traits
-│   ├── response.rs         # Response handling
-│   ├── impersonate.rs      # Browser impersonation
-│   └── utils.rs            # Certificate utilities
+│   ├── lib.rs              # 主要 Rust 实现
+│   ├── traits.rs           # 请求头转换 traits
+│   ├── response.rs         # 响应处理
+│   ├── impersonate.rs      # 浏览器伪装
+│   └── utils.rs            # 证书工具
 ├── never_primp/
-│   ├── __init__.py         # Python API wrapper
-│   └── never_primp.pyi     # Type hints
+│   ├── __init__.py         # Python API 包装器
+│   └── never_primp.pyi     # 类型提示
 ├── examples/
-│   ├── example_ordered_headers.py
+│   ├── example_headers.py
 │   └── example_split_cookies.py
-├── Cargo.toml              # Rust dependencies
-└── pyproject.toml          # Python package config
+├── Cargo.toml              # Rust 依赖
+└── pyproject.toml          # Python 包配置
 ```
 
 ---
 
-## 🤝 Contributing
+## 🤝 贡献
 
-Contributions are welcome! Please feel free to submit a Pull Request.
+欢迎贡献！请随时提交 Pull Request。
 
-### Development Guidelines
+### 开发指南
 
-1. Follow Rust best practices for src/ files
-2. Maintain Python 3.8+ compatibility
-3. Add tests for new features
-4. Update documentation
-
----
-
-## 📄 License
-
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+1. 遵循 Rust 最佳实践（src/ 文件）
+2. 保持 Python 3.8+ 兼容性
+3. 为新功能添加测试
+4. 更新文档
 
 ---
 
-## ⚠️ Disclaimer
+## 📄 许可证
 
-This tool is intended for **educational purposes** and **legitimate use cases** only, such as:
-- Testing your own applications
-- Academic research
-- Security auditing (with permission)
-- Data collection from public APIs
-
-**Important**:
-- Respect websites' `robots.txt` and Terms of Service
-- Do not use for malicious purposes or unauthorized access
-- Be mindful of rate limiting and server resources
-- The authors are not responsible for misuse of this tool
-
-Use responsibly and ethically. 🙏
+本项目基于 MIT 许可证 - 详见 [LICENSE](LICENSE) 文件。
 
 ---
 
-## 🙏 Acknowledgments
+## ⚠️ 免责声明
 
-Built with:
-- [wreq](https://github.com/0x676e67/wreq) - Rust HTTP client with browser impersonation
-- [PyO3](https://github.com/PyO3/pyo3) - Rust bindings for Python
-- [tokio](https://tokio.rs/) - Async runtime for Rust
+本工具仅用于**教育目的**和**合法用例**，例如：
+- 测试您自己的应用程序
+- 学术研究
+- 安全审计（需获得许可）
+- 从公共 API 收集数据
 
-Inspired by:
+**重要提示**：
+- 尊重网站的 `robots.txt` 和服务条款
+- 不要用于恶意目的或未经授权的访问
+- 注意速率限制和服务器资源
+- 作者不对滥用此工具负责
+
+请负责任和道德地使用。🙏
+
+---
+
+## 🙏 致谢
+
+构建基于：
+- [wreq](https://github.com/0x676e67/wreq) - 带浏览器伪装的 Rust HTTP 客户端
+- [PyO3](https://github.com/PyO3/pyo3) - Python 的 Rust 绑定
+- [tokio](https://tokio.rs/) - Rust 异步运行时
+
+灵感来源：
 - [curl-impersonate](https://github.com/lwthiker/curl-impersonate)
 - [httpx](https://github.com/encode/httpx)
 - [requests](https://github.com/psf/requests)
-
----
-
-## 📞 Support
-
-- 📖 [Documentation](ORDERED_HEADERS.md)
-- 🐛 [Issue Tracker](https://github.com/yourusername/never-primp/issues)
-- 💬 [Discussions](https://github.com/yourusername/never-primp/discussions)
+- [primp](https://github.com/deedy5/primp)
 
 ---
 
 <div align="center">
 
-**Made with ❤️ and ⚙️ Rust**
+**用 ❤️ 和 ⚙️ Rust 制作**
 
-If you find this project helpful, please consider giving it a ⭐!
+如果觉得这个项目有帮助，请给它一个 ⭐！
 
 </div>

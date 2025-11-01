@@ -23,17 +23,7 @@ cookies = {
 client = Client(proxy='http://127.0.0.1:9000',
                 cookies=cookies,
                 split_cookies=True,
-                ordered_headers = {
-    'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
-    'Accept-Encoding': 'gzip, deflate, br, zstd',
-    'Content-Type': 'application/json',
-    'sec-fetch-site': 'none',
-    'sec-fetch-mode': 'no-cors',
-    'sec-fetch-dest': 'empty',
-    'sec-fetch-storage-access': 'active',
-    'accept-language': 'zh-CN,zh;q=0.9',
-    'priority': 'u=4, i',
-},verify=False)
+                verify=False)
 
 params = {
     'runtime': 'native',
@@ -103,6 +93,17 @@ json_data = [
 response = client.post(
     'https://mcs.zijieapi.com/v1/list',
     params=params,
+    headers = {
+        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/135.0.0.0 Safari/537.36',
+        'Accept-Encoding': 'gzip, deflate, br, zstd',
+        'Content-Type': 'application/json',
+        'sec-fetch-site': 'none',
+        'sec-fetch-mode': 'no-cors',
+        'sec-fetch-dest': 'empty',
+        'sec-fetch-storage-access': 'active',
+        'accept-language': 'zh-CN,zh;q=0.9',
+        'priority': 'u=4, i',
+    },
     json=json_data
 )
 

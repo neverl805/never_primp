@@ -128,7 +128,7 @@ client = primp.Client(
 
 ```python
 client = primp.Client(
-    ordered_headers={
+    headers={
         "user-agent": "Mozilla/5.0...",
         "accept": "text/html,application/xhtml+xml",
         "accept-language": "en-US,en;q=0.9",
@@ -140,8 +140,6 @@ client = primp.Client(
 ```
 
 **使用场景**：检查请求头顺序的网站（Cloudflare、Akamai 等）
-
-📖 [完整文档](ORDERED_HEADERS.md)
 
 #### 2. **Cookie 分割 (HTTP/2)** 🆕
 像真实浏览器一样将 Cookie 作为独立的请求头发送：
@@ -176,7 +174,7 @@ client.impersonate = "safari_18"
 client.impersonate_os = "macos"
 
 # 更新请求头
-client.ordered_headers = {...}
+client.headers = {...}
 client.headers_update({"Referer": "https://example.com"})
 
 # 更改代理
@@ -353,7 +351,7 @@ client = primp.Client(
     impersonate_os="windows",
 
     # 高级反检测
-    ordered_headers={
+    headers={
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "sec-ch-ua": '"Chromium";v="141", "Not?A_Brand";v="8"',
         "sec-ch-ua-mobile": "?0",
@@ -388,7 +386,6 @@ response = client.get("https://difficult-site.com")
 
 ### 核心文档
 
-- [**有序请求头指南**](ORDERED_HEADERS.md) - 掌握请求头顺序控制以绕过反爬虫
 - [**Cookie 分割指南**](SPLIT_COOKIES.md) - 像真实浏览器一样处理 HTTP/2 Cookie
 
 ### 快速参考
@@ -403,8 +400,7 @@ Client(
     auth_bearer: str | None = None,
 
     # 请求头和 Cookie
-    headers: dict[str, str] | None = None,
-    ordered_headers: dict[str, str] | None = None,  # 🆕 有序请求头
+    headers: dict[str, str] | None = None,  # 🆕 有序请求头
     cookie_store: bool = True,
     split_cookies: bool = False,  # 🆕 HTTP/2 Cookie 分割
 
@@ -454,8 +450,7 @@ client.options(url, **kwargs)
 
 # 通用参数
 params: dict[str, str] | None = None,
-headers: dict[str, str] | None = None,
-ordered_headers: dict[str, str] | None = None,  # 🆕
+headers: dict[str, str] | None = None,  # 🆕
 cookies: dict[str, str] | None = None,
 auth: tuple[str, str | None] | None = None,
 auth_bearer: str | None = None,
@@ -530,7 +525,7 @@ import never_primp as primp
 client = primp.Client(
     impersonate="chrome_141",
     impersonate_os="windows",
-    ordered_headers={
+    headers={
         "user-agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
         "accept-language": "en-US,en;q=0.9",
@@ -704,7 +699,7 @@ pip install maturin
 maturin develop --release
 
 # 运行示例
-python examples/example_ordered_headers.py
+python examples/example_headers.py
 ```
 
 ### 项目结构
@@ -721,7 +716,7 @@ never-primp/
 │   ├── __init__.py         # Python API 包装器
 │   └── never_primp.pyi     # 类型提示
 ├── examples/
-│   ├── example_ordered_headers.py
+│   ├── example_headers.py
 │   └── example_split_cookies.py
 ├── Cargo.toml              # Rust 依赖
 └── pyproject.toml          # Python 包配置

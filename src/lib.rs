@@ -69,7 +69,6 @@ pub struct RClient {
     impersonate_os: Option<String>,
     // Configuration fields for client rebuild
     headers: Arc<Mutex<Option<IndexMapSSR>>>,
-    ordered_headers: Arc<Mutex<Option<IndexMapSSR>>>,
     cookie_store: Option<bool>,
     #[pyo3(get, set)]
     split_cookies: Option<bool>,
@@ -101,8 +100,13 @@ impl RClient {
     /// * `auth` - A tuple containing the username and an optional password for basic authentication. Default is None.
     /// * `auth_bearer` - A string representing the bearer token for bearer token authentication. Default is None.
     /// * `params` - A map of query parameters to append to the URL. Default is None.
-    /// * `headers` - An optional map of HTTP headers to send with requests. If `impersonate` is set, this will be ignored.
-    /// * `ordered_headers` - An optional ordered map of HTTP headers with strict order preservation. Takes priority over `headers`.
+    /// * `headers` - An optional ordered map of HTTP headers with strict order preservation.
+    ///   Headers will be sent in the exact order specified, with automatic positioning of:
+    ///   - Host (first position)
+    ///   - Content-Length (second position for POST/PUT/PATCH)
+    ///   - Content-Type (third position if auto-calculated)
+    ///   - cookie (second-to-last position)
+    ///   - priority (last position)
     /// * `cookie_store` - Enable a persistent cookie store. Received cookies will be preserved and included
     ///         in additional requests. Default is `true`.
     /// * `split_cookies` - Split cookies into multiple `cookie` headers (HTTP/2 style) instead of a single `Cookie` header.
@@ -145,7 +149,7 @@ impl RClient {
     /// )
     /// ```
     #[new]
-    #[pyo3(signature = (auth=None, auth_bearer=None, params=None, headers=None, ordered_headers=None, cookies=None, cookie_store=true,
+    #[pyo3(signature = (auth=None, auth_bearer=None, params=None, headers=None, cookies=None, cookie_store=true,
         split_cookies=false, referer=true, proxy=None, timeout=None, impersonate=None, impersonate_os=None, follow_redirects=true,
         max_redirects=20, verify=true, ca_cert_file=None, https_only=false, http1_only=false, http2_only=false,
         pool_idle_timeout=None, pool_max_idle_per_host=None, tcp_nodelay=None, tcp_keepalive=None))]
@@ -154,7 +158,6 @@ impl RClient {
         auth_bearer: Option<String>,
         params: Option<IndexMapSSR>,
         headers: Option<IndexMapSSR>,
-        ordered_headers: Option<IndexMapSSR>,
         cookies: Option<IndexMapSSR>,
         cookie_store: Option<bool>,
         split_cookies: Option<bool>,
@@ -194,16 +197,9 @@ impl RClient {
             client_builder = client_builder.emulation(emulation_option);
         }
 
-        // Headers - prioritize ordered_headers over regular headers
-        if let Some(ref _ordered_hdrs) = ordered_headers {
-            // Don't set ordered_headers as default_headers to avoid duplication
-            // They will be applied dynamically at request time with proper ordering
-            // (including Host, Content-Length repositioning)
-        } else if let Some(ref hdrs) = headers {
-            // Fallback to regular headers
-            let headers_headermap = hdrs.to_headermap();
-            client_builder = client_builder.default_headers(headers_headermap);
-        };
+        // Headers - don't set as default_headers to avoid duplication
+        // They will be applied dynamically at request time with proper ordering
+        // (including Host, Content-Length repositioning)
 
         // Cookie jar - create and configure
         let cookie_jar = Arc::new(wreq::cookie::Jar::default());
@@ -297,7 +293,6 @@ impl RClient {
             impersonate_os,
             // Store configuration for potential client rebuild
             headers: Arc::new(Mutex::new(headers)),
-            ordered_headers: Arc::new(Mutex::new(ordered_headers)),
             cookie_store,
             split_cookies,
             referer,
@@ -345,48 +340,12 @@ impl RClient {
         if let Some(new_headers) = new_headers {
             if let Ok(mut headers_guard) = self.headers.lock() {
                 if let Some(existing_headers) = headers_guard.as_mut() {
-                    // Update existing headers
+                    // Update existing headers (preserves insertion order)
                     for (key, value) in new_headers {
                         existing_headers.insert(key, value);
                     }
                 } else {
                     // No existing headers, set new ones
-                    *headers_guard = Some(new_headers);
-                }
-            }
-            self.rebuild_client()?;
-        }
-        Ok(())
-    }
-
-    #[getter]
-    pub fn get_ordered_headers(&self) -> Result<IndexMapSSR> {
-        if let Ok(headers_guard) = self.ordered_headers.lock() {
-            Ok(headers_guard.clone().unwrap_or_else(|| IndexMap::with_capacity_and_hasher(10, RandomState::default())))
-        } else {
-            Ok(IndexMap::with_capacity_and_hasher(10, RandomState::default()))
-        }
-    }
-
-    #[setter]
-    pub fn set_ordered_headers(&mut self, new_headers: Option<IndexMapSSR>) -> Result<()> {
-        if let Ok(mut headers_guard) = self.ordered_headers.lock() {
-            *headers_guard = new_headers;
-        }
-        self.rebuild_client()?;
-        Ok(())
-    }
-
-    pub fn ordered_headers_update(&mut self, new_headers: Option<IndexMapSSR>) -> Result<()> {
-        if let Some(new_headers) = new_headers {
-            if let Ok(mut headers_guard) = self.ordered_headers.lock() {
-                if let Some(existing_headers) = headers_guard.as_mut() {
-                    // Update existing ordered headers (preserves insertion order)
-                    for (key, value) in new_headers {
-                        existing_headers.insert(key, value);
-                    }
-                } else {
-                    // No existing ordered headers, set new ones
                     *headers_guard = Some(new_headers);
                 }
             }
@@ -583,7 +542,7 @@ impl RClient {
     /// # Errors
     ///
     /// * `PyException` - If there is an error making the request.
-    #[pyo3(signature = (method, url, params=None, headers=None, ordered_headers=None, cookies=None, content=None,
+    #[pyo3(signature = (method, url, params=None, headers=None, cookies=None, content=None,
         data=None, json=None, files=None, auth=None, auth_bearer=None, timeout=None))]
     fn request(
         &self,
@@ -592,7 +551,6 @@ impl RClient {
         url: &str,
         params: Option<IndexMapSSR>,
         headers: Option<IndexMapSSR>,
-        ordered_headers: Option<IndexMapSSR>,
         cookies: Option<IndexMapSSR>,
         content: Option<Vec<u8>>,
         data: Option<&Bound<'_, PyAny>>,
@@ -733,22 +691,22 @@ impl RClient {
             };
 
             // Headers - reorder to match browser behavior: Host first, then Content-Length, then others
-            // Check both request-level and client-level ordered_headers
-            let effective_ordered_headers = if ordered_headers.is_some() {
-                ordered_headers
+            // Check both request-level and client-level headers
+            let effective_headers = if headers.is_some() {
+                headers
             } else {
-                // Use client-level ordered_headers if no request-level specified
-                self.ordered_headers.lock().ok().and_then(|guard| guard.clone())
+                // Use client-level headers if no request-level specified
+                self.headers.lock().ok().and_then(|guard| guard.clone())
             };
 
-            if let Some(ordered_hdrs) = effective_ordered_headers {
+            if let Some(hdrs) = effective_headers {
                 // Create a new ordered map with strict ordering
-                let mut reordered_headers = IndexMap::with_capacity_and_hasher(ordered_hdrs.len() + 2, RandomState::default());
+                let mut reordered_headers = IndexMap::with_capacity_and_hasher(hdrs.len() + 2, RandomState::default());
 
                 // 1. First, add Host header if present (case-insensitive check)
-                let host_value = ordered_hdrs.get("Host")
-                    .or_else(|| ordered_hdrs.get("host"))
-                    .or_else(|| ordered_hdrs.get("HOST"));
+                let host_value = hdrs.get("Host")
+                    .or_else(|| hdrs.get("host"))
+                    .or_else(|| hdrs.get("HOST"));
 
                 if let Some(host) = host_value {
                     reordered_headers.insert("Host".to_string(), host.clone());
@@ -766,7 +724,7 @@ impl RClient {
 
                 // 3. Add Content-Type if we calculated it (and user didn't specify)
                 if let Some(ct) = content_type_header {
-                    let has_content_type = ordered_hdrs.iter().any(|(k, _)| k.to_lowercase() == "content-type");
+                    let has_content_type = hdrs.iter().any(|(k, _)| k.to_lowercase() == "content-type");
                     if !has_content_type {
                         reordered_headers.insert("Content-Type".to_string(), ct);
                     }
@@ -777,7 +735,7 @@ impl RClient {
                 let mut priority_header: Option<(String, String)> = None;
                 let mut cookie_from_headers: Option<(String, String)> = None;
 
-                for (key, value) in ordered_hdrs.iter() {
+                for (key, value) in hdrs.iter() {
                     let key_lower = key.to_lowercase();
                     // Skip if already added or if it's priority/cookie (will be added later)
                     if key_lower == "host" || key_lower == "content-length" || reordered_headers.contains_key(key) {
@@ -865,7 +823,7 @@ impl RClient {
                             }
                         }
                     } else if let Some((_, ref value)) = cookie_from_headers {
-                        // If cookie came from ordered_headers, split it
+                        // If cookie came from headers, split it
                         for part in value.split(';') {
                             let part = part.trim();
                             if !part.is_empty() {
@@ -878,30 +836,6 @@ impl RClient {
                     // Use header_append to ensure it's added at the end
                     if let Some((ref key, ref value)) = priority_header {
                         request_builder = request_builder.header_append(key, value);
-                    }
-                }
-            } else if let Some(headers) = headers {
-                // Fallback to regular headers
-                request_builder = request_builder.headers(headers.to_headermap());
-
-                // Add cookies separately if using regular headers
-                if let Some(cookies) = &effective_cookies {
-                    if !cookies.is_empty() {
-                        if self.split_cookies.unwrap_or(false) {
-                            // Split: multiple cookie headers (HTTP/2 style)
-                            for (k, v) in cookies.iter() {
-                                let cookie_value = format!("{}={}", k, v);
-                                request_builder = request_builder.header_append("cookie", cookie_value);
-                            }
-                        } else {
-                            // Merge: single Cookie header (HTTP/1.1 style, default)
-                            let cookie_value = cookies
-                                .iter()
-                                .map(|(k, v)| format!("{}={}", k, v))
-                                .collect::<Vec<_>>()
-                                .join("; ");
-                            request_builder = request_builder.header("Cookie", cookie_value);
-                        }
                     }
                 }
             }
@@ -1027,25 +961,9 @@ impl RClient {
             client_builder = client_builder.emulation(emulation_option);
         }
 
-        // Headers - prioritize ordered_headers over regular headers
-        if let Ok(ordered_guard) = self.ordered_headers.lock() {
-            if let Some(_ordered_hdrs) = ordered_guard.as_ref() {
-                // Don't set ordered_headers as default_headers to avoid duplication
-                // They will be applied dynamically at request time with proper ordering
-            } else if let Ok(headers_guard) = self.headers.lock() {
-                if let Some(headers) = headers_guard.as_ref() {
-                    // Fallback to regular headers
-                    let headers_headermap = headers.to_headermap();
-                    client_builder = client_builder.default_headers(headers_headermap);
-                }
-            }
-        } else if let Ok(headers_guard) = self.headers.lock() {
-            if let Some(headers) = headers_guard.as_ref() {
-                // Fallback to regular headers
-                let headers_headermap = headers.to_headermap();
-                client_builder = client_builder.default_headers(headers_headermap);
-            }
-        }
+        // Headers - don't set as default_headers to avoid duplication
+        // They will be applied dynamically at request time with proper ordering
+        // (including Host, Content-Length repositioning)
 
         // Cookie_store
         if self.cookie_store.unwrap_or(true) {

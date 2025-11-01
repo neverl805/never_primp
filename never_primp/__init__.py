@@ -142,7 +142,6 @@ class Client(RClient):
             auth_bearer: str | None = None,
             params: dict[str, str] | None = None,
             headers: dict[str, str] | None = None,
-            ordered_headers: dict[str, str] | None = None,
             cookies: dict[str, str] | None = None,
             cookie_store: bool | None = True,
             split_cookies: bool | None = False,
@@ -168,9 +167,13 @@ class Client(RClient):
             auth: a tuple containing the username and an optional password for basic authentication. Default is None.
             auth_bearer: a string representing the bearer token for bearer token authentication. Default is None.
             params: a map of query parameters to append to the URL. Default is None.
-            headers: an optional map of HTTP headers to send with requests. Ignored if `impersonate` is set.
-            ordered_headers: an optional ordered map of HTTP headers with strict order preservation.
-                Takes priority over `headers`. Use this for bypassing anti-bot detection that checks header order.
+            headers: an optional ordered map of HTTP headers with strict order preservation.
+                Headers will be sent in the exact order specified, with automatic positioning of:
+                - Host (first position)
+                - Content-Length (second position for POST/PUT/PATCH)
+                - Content-Type (third position if auto-calculated)
+                - cookie (second-to-last position)
+                - priority (last position)
                 Example: {"User-Agent": "...", "Accept": "...", "Accept-Language": "..."}
                 Note: Python 3.7+ dict maintains insertion order by default.
             cookies: initial cookies to set for the client. These cookies will be included in all requests.
@@ -356,13 +359,12 @@ class AsyncClient(Client):
                  auth_bearer: str | None = None,
                  params: dict[str, str] | None = None,
                  headers: dict[str, str] | None = None,
-                 ordered_headers: dict[str, str] | None = None,
                  cookies: dict[str, str] | None = None,
                  cookie_store: bool | None = True,
                  split_cookies: bool | None = False,
                  referer: bool | None = True,
                  proxy: str | None = None,
-                 timeout: float | None = 30,
+                 timeout: float | None = None,
                  impersonate: IMPERSONATE | None = None,
                  impersonate_os: IMPERSONATE_OS | None = None,
                  follow_redirects: bool | None = True,
@@ -383,7 +385,6 @@ class AsyncClient(Client):
             auth_bearer=auth_bearer,
             params=params,
             headers=headers,
-            ordered_headers=ordered_headers,
             cookies=cookies,
             cookie_store=cookie_store,
             split_cookies=split_cookies,

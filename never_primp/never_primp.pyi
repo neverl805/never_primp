@@ -38,7 +38,6 @@ class RequestParams(TypedDict, total=False):
     auth_bearer: str | None
     params: dict[str, str] | None
     headers: dict[str, str] | None
-    ordered_headers: dict[str, str] | None
     cookies: dict[str, str] | None
     timeout: float | None
     content: bytes | None
@@ -83,7 +82,6 @@ class RClient:
         auth_bearer: str | None = None,
         params: dict[str, str] | None = None,
         headers: dict[str, str] | None = None,
-        ordered_headers: dict[str, str] | None = None,
         cookies: dict[str, str] | None = None,
         cookie_store: bool | None = True,
         split_cookies: bool | None = False,
@@ -109,11 +107,6 @@ class RClient:
     @headers.setter
     def headers(self, headers: dict[str, str]) -> None: ...
     def headers_update(self, headers: dict[str, str]) -> None: ...
-    @property
-    def ordered_headers(self) -> dict[str, str]: ...
-    @ordered_headers.setter
-    def ordered_headers(self, ordered_headers: dict[str, str]) -> None: ...
-    def ordered_headers_update(self, ordered_headers: dict[str, str]) -> None: ...
     # Cookie management methods (no URL required)
     def get_all_cookies(self) -> dict[str, str]: ...
     def set_cookie(self, name: str, value: str, domain: str | None = None, path: str | None = None) -> None: ...
